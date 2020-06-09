@@ -1,0 +1,271 @@
+
+% make text 4.16'' x 7''
+% fleqn, leqno
+
+\documentclass[twoside,11pt]{article}
+
+\usepackage[utf8]{inputenc}
+
+\usepackage[%
+%paperwidth=5.16in,
+paperwidth=5.5in,
+paperheight=8.5in,
+left=.5in,
+right=.5in,
+bottom=.5in,
+top=1in % typically =1in, but changing temporarily...
+]{geometry}
+%
+
+%\renewcommand{\numberline}[1]{#1~}
+
+
+
+% we want to indent first paragraphs
+\usepackage{indentfirst}
+
+% typography tools
+\linespread{.9}
+\usepackage{microtype}
+
+% set paragraph indentation
+\setlength{\parindent}{2em}
+
+
+% for section numbering
+\usepackage[]{titlesec} 
+\newcommand{\periodafter}[1]{#1.}
+
+%\titleformat{\chapter}%
+%{\centering\normalsize\sc}
+%{\thechapter\periodafter}{1em}{}
+
+\titleformat{\section}%
+{\centering\normalsize\sc}
+{\thesection\periodafter}{1em}{}
+
+\titleformat{\subsection}%
+{\normalsize\itshape}
+{\thesection.\thesubsection\periodafter}{1em}{}
+
+\titleformat{\subsubsection}%
+{\normalsize\itshape}
+{\thesection.\thesubsection.\thesubsubsection\periodafter}{1em}{}
+
+
+%\renewcommand{\thechapter}{\Roman{chapter}}
+\renewcommand{\thesection}{\Roman{section}}
+\renewcommand{\thesubsection}{\Alph{subsection}}
+\renewcommand{\thesubsubsection}{\roman{subsubsection}}
+
+
+
+
+
+
+%----------------------------------
+% NEW CENTURY SCHOOLBOOK (QJE)
+\usepackage{fouriernc}
+\usepackage[cal=cm]{mathalpha} % I prefer these mathcal letters
+
+
+
+
+%=====================================================================
+% Stuff for getting the content how you want it
+
+
+%\usepackage[T1]{fontenc} % hyphenation for accented characters?
+\usepackage{mathtools}
+\usepackage{enumitem} %\begin{enumerate}[label=Case \arabic*., align=left, leftmargin=*]
+\usepackage{amsthm}
+   \newtheorem{theorem}{Theorem}
+   \newtheorem{prop}{Proposition}
+   \newtheorem{lemma}{Lemma}
+   \newtheorem{coro}{Corollary}
+\usepackage{commath} % calculus: \dif (also has mixed partial derivative...)
+\usepackage{tcolorbox} % inset boxes
+\usepackage{physics} % for \dv and \pdv
+   \newcommand{\wpdv}[2]{\partial #1 / \partial #2}
+\usepackage{natbib}
+   \bibliographystyle{authordate1}
+
+\usepackage{centernot} % for \centernot\implies
+\newcommand{\nimplies}{\centernot\implies}
+
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{subcaption}
+%\usepackage{subfig} % could be useful for some journals
+
+\usepackage{booktabs}
+\usepackage{tabularx}
+\newcolumntype{Y}{>{\raggedleft\arraybackslash}X}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+\newcommand{\ra}[1]{\renewcommand{\arraystretch}{#1}}
+
+% Redefining the abstract to have width=\textwidth
+\renewenvironment{abstract}
+  {\noindent
+   \begin{minipage}[t]{\textwidth}
+   \setlength{\parindent}{2em}
+   \renewcommand{\baselinestretch}{1.0}
+   \footnotesize}
+  {\end{minipage}}
+  
+  
+%=====================================================================
+% Some stuff for captioning figures
+\usepackage[%
+format=plain,
+labelformat=simple,
+labelsep=newline,
+justification=centerfirst,
+labelfont={footnotesize,sc},
+textfont={footnotesize}
+]{caption}
+\setlength{\abovecaptionskip}{8pt plus 0pt minus 2pt}
+%\setlength{\abovecaptionskip}{0pt}
+\setlength{\belowcaptionskip}{-2pt}
+
+\newcommand{\mycaption}[2]{%
+	\caption[#1]{%
+		\begin{minipage}[]{\textwidth}
+		\setlength{\parindent}{1em}
+		\vspace{.25cm}
+		\begin{center}
+		#1
+		\end{center}
+		\vspace{-.25cm}
+		
+		#2
+		\end{minipage}
+	}
+}
+
+\renewcommand{\thetable}{\Roman{table}}
+\renewcommand{\thefigure}{\Roman{figure}}
+\renewcommand{\thesubtable}{\Alph{subtable}}
+\renewcommand{\thesubfigure}{\Alph{subfigure}}
+
+\usepackage[dotinlabels]{titletoc}
+
+\dottedcontents{section}% section
+               [3em]% how far in (from margin) do you want the title to start?
+               {\addvspace{.5em}\footnotesize\sc}% before-code
+               {3em}% how far back (from the title words) do you want the number to appear?
+               {0.75em}% how much elbow-room do the dots require
+
+\dottedcontents{subsection}%
+               [6em]%
+               {\addvspace{.25em}\footnotesize\itshape}%
+               {3em}%
+               {0.75em}
+
+\dottedcontents{subsubsection}%
+               [9em]%
+               {\addvspace{.25em}\footnotesize\itshape}%
+               {3em}%
+               {0.75em}
+
+\setcounter{tocdepth}{3}
+
+%=====================================================================
+% Useful macros
+
+\renewcommand{\L}{\mathcal{L}}
+\newcommand{\U}{\mathcal{U}}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+
+\newcommand{\E}{E}
+\newcommand{\giv}{\;|\;}
+\newcommand{\eps}{\varepsilon}
+
+%\usepackage{amsmath}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator{\sign}{sgn}
+
+\renewcommand{\dot}[1]{\overset{\textrm{\large{.}}}{#1}}
+
+%=====================================================================
+% Latin macros
+
+\newcommand{\ie}{\emph{i.e.},~}
+\newcommand{\Ie}{\emph{I.e.},~}
+\newcommand{\eg}{\emph{e.g.}~}
+\newcommand{\cetpar}{\emph{cet. par.},~}
+\newcommand{\parpas}{\emph{pari passu}~}
+\newcommand{\qua}{\emph{quaesitum}~}
+
+%=====================================================================
+% Shortcuts for brackets/parentheses of different sizes
+
+\newcommand{\bigb}[1]{\big[ #1 \big]}
+\newcommand{\Bigb}[1]{\Big[ #1 \Big]}
+\newcommand{\biggb}[1]{\bigg[ #1 \bigg]}
+\newcommand{\Biggb}[1]{\Bigg[ #1 \Bigg]}
+
+\newcommand{\bigp}[1]{\big( #1 \big)}
+\newcommand{\Bigp}[1]{\Big( #1 \Big)}
+\newcommand{\biggp}[1]{\bigg( #1 \bigg)}
+\newcommand{\Biggp}[1]{\Bigg( #1 \Bigg)}
+
+\newcommand{\bigc}[1]{\big\{ #1 \big\}}
+\newcommand{\Bigc}[1]{\Big\{ #1 \Big\}}
+\newcommand{\biggc}[1]{\bigg\{ #1 \bigg\}}
+\newcommand{\Biggc}[1]{\Bigg\{ #1 \Bigg\}}
+
+
+%=====================================================================
+% Not sure how this works, but it pushes stuff to the right if you need that within align.
+
+\makeatletter
+\newcommand{\pushright}[1]{\ifmeasuring@#1\else\omit\hfill$\displaystyle#1$\fi\ignorespaces}
+\newcommand{\pushleft}[1]{\ifmeasuring@#1\else\omit$\displaystyle#1$\hfill\fi\ignorespaces}
+\makeatother
+
+
+
+\usepackage{xcolor}
+
+% lighter color palette
+\definecolor{OperaBlue}{HTML}{87A7B7}
+\definecolor{OperaMauve}{HTML}{B784A7}
+\definecolor{OperaGreen}{HTML}{A7B784}
+
+% preferred triadic color palette
+\definecolor{BlueTaupe}{HTML}{5F6D91}
+\definecolor{MauveTaupe}{HTML}{915F6D}
+\definecolor{GreenTaupe}{HTML}{6D915F}
+
+% darker color palette
+\definecolor{OldBlue}{HTML}{314767}
+\definecolor{OldMauve}{HTML}{673147}
+\definecolor{OldGreen}{HTML}{476731}
+
+
+% Cambridge color scheme
+\definecolor{CamRed}{HTML}{D50032}
+\definecolor{CamBlue}{HTML}{0072CE}
+\definecolor{CamOrange}{HTML}{E87722}
+\definecolor{CamGreen}{HTML}{64A70B}
+\definecolor{CamPurple}{HTML}{93328E}
+\definecolor{CamTeal}{HTML}{00B0B9}
+
+
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks = true, %Colours links instead of ugly boxes
+  urlcolor   = blue, %Colour for external hyperlinks
+  linkcolor  = blue, %Colour of internal links
+  citecolor  = blue  %Colour of citations
+}
+\usepackage[nameinlink,noabbrev]{cleveref}
+
+
+
+

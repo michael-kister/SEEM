@@ -30,7 +30,16 @@ void insert_sort_int(int*, int);
 void flatten_tensor(double*, double*, int, int, int, int);
 
 
-// basically we want this class for when we need the copy-swap idiom
+/**
+ * -----------------------------------------------------------------------------
+ * This is the lowest-level class relevant for solving a model via perturbation
+ * methods.
+ *
+ * Its main function is to store arrays containing first- and second-order
+ * coefficients for quadratic approximations to transition and observation
+ * functions.
+ * -----------------------------------------------------------------------------
+ */
 class SGU_BASE
 {
 private:

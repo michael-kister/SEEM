@@ -1,0 +1,162 @@
+
+\input{header.tex}
+
+\usepackage{tikz}
+
+%\usepackage{pgfplots}
+%\usepgfplotslibrary{fillbetween}
+%\pgfplotsset{compat = newest}
+
+\newpagestyle{main}{
+  \sethead
+    [\thepage][\textit{\footnotesize{DIAGRAM}}][]  % even
+    {}{\textit{\footnotesize{DIAGRAM}}}{\thepage}} % odd
+\pagestyle{main}
+
+\usetikzlibrary{decorations.pathreplacing,angles,quotes}
+
+
+\begin{document}
+
+When we use \texttt{ADOL-C} to differentiate a function with respect to $n$ variables, with maximum degree $d$, we can consider the combinatorics problem of choosing $d$ elements from a set of $n+1$ elements, where repetitions are allowed.
+Note that the ``extra'' element corresponds to the null variable, for which we do not differentiate.
+Therefore, upon performing the differentiation, we expect the number of values to be given by:
+\[
+N = \biggp{\begin{array}{c} (n+1)+d-1 \\ d \end{array}} = 
+    \biggp{\begin{array}{c} n+d \\ d \end{array}} = 
+    \frac{(n+d)!}{(d)!(n)!}.
+\]
+
+On one hand, the data is 5D, but \texttt{ADOL-C} thinks it's 3D, and uses a 2D storage method.
+On the other hand, we would like to make use of the dimensions that \texttt{ADOL-C} doesn't know about, and we would then like to permute the tensor, and use our own 2D storage method.
+To top matters off, the 2D storage used by \texttt{ADOL-C} is more efficient than we need, so the mapping is not a function (since most of their values map to more than one of our storage locations). 
+
+\[
+\left[
+\begin{array}{ccc|ccc|c|ccc}
+\pdv{F_{1}}{r_{1}}{c_{1}} & \cdots & \pdv{F_{1}}{r_{1}}{c_{q}} &
+\pdv{F_{1}}{r_{2}}{c_{1}} & \cdots & \pdv{F_{1}}{r_{2}}{c_{q}} & \cdots & 
+\pdv{F_{1}}{r_{p}}{c_{1}} & \cdots & \pdv{F_{1}}{r_{p}}{c_{q}} \\
+%
+\pdv{F_{2}}{r_{1}}{c_{1}} & \cdots & \pdv{F_{2}}{r_{1}}{c_{q}} &
+\pdv{F_{2}}{r_{2}}{c_{1}} & \cdots & \pdv{F_{2}}{r_{2}}{c_{q}} & \cdots & 
+\pdv{F_{2}}{r_{p}}{c_{1}} & \cdots & \pdv{F_{2}}{r_{p}}{c_{q}} \\
+%
+\vdots & & \vdots & \vdots & & \vdots & & \vdots & & \vdots \\
+%
+\pdv{F_{n}}{r_{1}}{c_{1}} & \cdots & \pdv{F_{n}}{r_{1}}{c_{q}} &
+\pdv{F_{n}}{r_{2}}{c_{1}} & \cdots & \pdv{F_{n}}{r_{2}}{c_{q}} & \cdots & 
+\pdv{F_{n}}{r_{p}}{c_{1}} & \cdots & \pdv{F_{n}}{r_{p}}{c_{q}}
+\end{array}
+\right]
+\]
+
+
+%This interpretation suggests organizing the values into a multi-dimensional array, where each degree of differentiation corresponds to a dimension of the array, and traversing a given dimension enumerates the different variables.
+
+%We consider an example where the maximum degree of differentiation is 2, and there are 6 variables with respect to which we can differentiate. Using the above formula, we recognize that there will be 28 ways to differentiate our function. Recognize that as long as the vector containing the indices is ``non-increasing,'' (e.g. element 12 is given by $(4,2)$, where $4 > 2$) that we do not need to know the total number of variables.
+
+%In practice, we will give the function $d$ as well, however this should only be used in order to know the length of the array of indices.
+
+%One of our initial challenges in solving the model is to construct arrays of 
+
+
+
+\begin{figure}
+\centering
+
+\begin{tikzpicture}[scale=0.85]
+
+\filldraw[color=red!10, fill=red!10] (-.1,-.1) rectangle (6.9,0.9);
+\filldraw[color=red!10, fill=red!10] (-.1,0.9) rectangle (5.9,1.9);
+\filldraw[color=red!10, fill=red!10] (-.1,1.9) rectangle (4.9,3.9);
+\filldraw[color=red!10, fill=red!10] (-.1,3.9) rectangle (2.9,5.9);
+\filldraw[color=red!10, fill=red!10] (-.1,5.9) rectangle (0.9,6.9);
+
+\draw[red, solid] (-.1,-.1) -- (6.9,-.1);
+\draw[red, solid] (-.1,0.9) -- (6.9,0.9);
+\draw[red, solid] (-.1,1.9) -- (6.9,1.9);
+\draw[red, solid] (-.1,3.9) -- (6.9,3.9);
+\draw[red, solid] (-.1,5.9) -- (6.9,5.9);
+\draw[red, solid] (-.1,6.9) -- (6.9,6.9);
+
+\draw[red, solid] (-.1,-.1) -- (-.1,6.9);
+\draw[red, solid] (0.9,-.1) -- (0.9,6.9);
+\draw[red, solid] (2.9,-.1) -- (2.9,6.9);
+\draw[red, solid] (4.9,-.1) -- (4.9,6.9);
+\draw[red, solid] (5.9,-.1) -- (5.9,6.9);
+\draw[red, solid] (6.9,-.1) -- (6.9,6.9);
+
+
+\filldraw[color=black, fill=green!0!blue] (0,6) rectangle node[text=white]{0} (.8,6.8);
+
+\filldraw[color=black, fill=green!4!blue] (0,5) rectangle node[text=white]{1} (.8,5.8);
+\filldraw[color=black, fill=green!7!blue] (1,5) rectangle node[text=white]{2} (1.8,5.8);
+
+\filldraw[color=black, fill=green!11!blue] (0,4) rectangle node[text=white]{3} (.8,4.8);
+\filldraw[color=black, fill=green!15!blue] (1,4) rectangle node[text=white]{4} (1.8,4.8);
+\filldraw[color=black, fill=green!19!blue] (2,4) rectangle node[text=white]{5} (2.8,4.8);
+
+\filldraw[color=black, fill=green!22!blue] (0,3) rectangle node[text=white]{6} (.8,3.8);
+\filldraw[color=black, fill=green!26!blue] (1,3) rectangle node[text=white]{7} (1.8,3.8);
+\filldraw[color=black, fill=green!30!blue] (2,3) rectangle node[text=white]{8} (2.8,3.8);
+\filldraw[color=black, fill=green!33!blue] (3,3) rectangle node[text=white]{9} (3.8,3.8);
+
+\filldraw[color=black, fill=green!37!blue] (0,2) rectangle node[text=white]{10} (.8,2.8);
+\filldraw[color=black, fill=green!41!blue] (1,2) rectangle node[text=white]{11} (1.8,2.8);
+\filldraw[color=black, fill=green!44!blue] (2,2) rectangle node[text=white]{12} (2.8,2.8);
+\filldraw[color=black, fill=green!48!blue] (3,2) rectangle node[text=white]{13} (3.8,2.8);
+\filldraw[color=black, fill=green!52!blue] (4,2) rectangle node[text=white]{14} (4.8,2.8);
+
+\filldraw[color=black, fill=green!56!blue] (0,1) rectangle node[text=white]{15} (.8,1.8);
+\filldraw[color=black, fill=green!59!blue] (1,1) rectangle node[text=white]{16} (1.8,1.8);
+\filldraw[color=black, fill=green!63!blue] (2,1) rectangle node[text=white]{17} (2.8,1.8);
+\filldraw[color=black, fill=green!67!blue] (3,1) rectangle node[text=white]{18} (3.8,1.8);
+\filldraw[color=black, fill=green!70!blue] (4,1) rectangle node[text=white]{19} (4.8,1.8);
+\filldraw[color=black, fill=green!74!blue] (5,1) rectangle node[text=white]{20} (5.8,1.8);
+
+\filldraw[color=black, fill=green!78!blue] (0,0) rectangle node[text=white]{21} (.8,.8);
+\filldraw[color=black, fill=green!81!blue] (1,0) rectangle node[text=white]{22} (1.8,.8);
+\filldraw[color=black, fill=green!85!blue] (2,0) rectangle node[text=white]{23} (2.8,.8);
+\filldraw[color=black, fill=green!89!blue] (3,0) rectangle node[text=white]{24} (3.8,.8);
+\filldraw[color=black, fill=green!93!blue] (4,0) rectangle node[text=white]{25} (4.8,.8);
+\filldraw[color=black, fill=green!96!blue] (5,0) rectangle node[text=white]{26} (5.8,.8);
+\filldraw[color=black, fill=green!100!blue] (6,0) rectangle node[text=white]{27} (6.8,.8);
+
+\draw (0,7.5) -- (6.8,7.5);
+\draw (0.4,7.4) -- (0.4,7.6) node[anchor=south]{$x_{0}$};
+\draw (1.4,7.4) -- (1.4,7.6) node[anchor=south]{$x_{1}$};
+\draw (2.4,7.4) -- (2.4,7.6) node[anchor=south]{$x_{2}$};
+\draw (3.4,7.4) -- (3.4,7.6) node[anchor=south]{$x_{3}$};
+\draw (4.4,7.4) -- (4.4,7.6) node[anchor=south]{$x_{4}$};
+\draw (5.4,7.4) -- (5.4,7.6) node[anchor=south]{$x_{5}$};
+\draw (6.4,7.4) -- (6.4,7.6) node[anchor=south]{$x_{6}$};
+
+\draw (-.7,0) -- (-.7,6.8);
+\draw (-.6,6.4) -- (-.8,6.4) node[anchor=east]{$x_{0}$};
+\draw (-.6,5.4) -- (-.8,5.4) node[anchor=east]{$x_{1}$};
+\draw (-.6,4.4) -- (-.8,4.4) node[anchor=east]{$x_{2}$};
+\draw (-.6,3.4) -- (-.8,3.4) node[anchor=east]{$x_{3}$};
+\draw (-.6,2.4) -- (-.8,2.4) node[anchor=east]{$x_{4}$};
+\draw (-.6,1.4) -- (-.8,1.4) node[anchor=east]{$x_{5}$};
+\draw (-.6,0.4) -- (-.8,0.4) node[anchor=east]{$x_{6}$};
+
+\draw[decoration={brace,mirror},decorate,color=red] (0, -.5) -- node[anchor=north] {$\frac{\partial}{\partial 1}$} (0.8,-.5);
+\draw[decoration={brace,mirror},decorate,color=red] (1, -.5) -- node[anchor=north] {$\frac{\partial}{\partial \mathbf{x}}$} (2.8,-.5);
+\draw[decoration={brace,mirror},decorate,color=red] (3, -.5) -- node[anchor=north] {$\frac{\partial}{\partial \mathbf{x}'}$} (4.8,-.5);
+\draw[decoration={brace,mirror},decorate,color=red] (5, -.5) -- node[anchor=north] {$\frac{\partial}{\partial \mathbf{y}}$} (5.8,-.5);
+\draw[decoration={brace,mirror},decorate,color=red] (6, -.5) -- node[anchor=north] {$\frac{\partial}{\partial \mathbf{y}'}$} (6.8,-.5);
+
+\draw[decoration={brace,mirror},decorate,color=red] (7.3, 0) -- node[anchor=west] {$\frac{\partial}{\partial \mathbf{y}'}$} (7.3,0.8);
+\draw[decoration={brace,mirror},decorate,color=red] (7.3, 1) -- node[anchor=west] {$\frac{\partial}{\partial \mathbf{y}}$} (7.3,1.8);
+\draw[decoration={brace,mirror},decorate,color=red] (7.3, 2) -- node[anchor=west] {$\frac{\partial}{\partial \mathbf{x}'}$} (7.3,3.8);
+\draw[decoration={brace,mirror},decorate,color=red] (7.3, 4) -- node[anchor=west] {$\frac{\partial}{\partial \mathbf{x}}$} (7.3,5.8);
+\draw[decoration={brace,mirror},decorate,color=red] (7.3, 6) -- node[anchor=west] {$\frac{\partial}{\partial 1}$} (7.3,6.8);
+
+\end{tikzpicture}
+
+\mycaption{\texttt{ADOL-C} Arrangement}{If $n_{x} = 2$ and $n_{y} = 1$, then there are 6 variables with respect to which we can differentiate 0, 1, or 2 times.}
+\label{fig1}
+\end{figure}
+
+\end{document}

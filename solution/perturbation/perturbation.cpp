@@ -444,12 +444,15 @@ void perturbation::differentiate_tag()
 
 void perturbation::map_tetrahedral_to_tensors(void)
 {
-    for (int i = 0; i < nblock; i++)
-	for (int j = 0; j < nx+ny; j++)
-	    for (int k = 0; k < block_sizes[i]; k++) {
-		derivatives[i][block_sizes[i]*j+k] =
-		    adolc_tensor[j][derivative_map[i][k]];
-	    }
+    for (int j_fvar = 0; j_fvar < nx+ny; j_fvar++)
+    for (int i_block = 0; i_block < nblock; i++)
+	  
+            for (int k_diff = 0; k_diff < block_sizes[i_block]; k_diff++) {
+	      
+	        derivatives[i_block][k_diff + j_fvar * block_sizes[i_block]] =
+		  
+	            adolc_tensor[j_fvar][derivative_map[i_block][k_diff]];
+      }
 }
 
 
