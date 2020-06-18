@@ -1,0 +1,140 @@
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <math.h>
+#include <adolc/adolc.h>
+
+/**
+ * This is a script to test out the ADOL-C compilation process.
+ *
+ * we're going to have three input variables map to two output variables.
+ *
+ * f(x,y,z) = alpha * x^1 + beta * y^2 + gamma * z^3;
+ * g(x,y,z) = alpha * x^3 + beta * y^1 + gamma * z^2,
+ *
+ * with:
+ *
+ * alpha = 2;
+ * beta  = 4;
+ * gamma = 1;
+ *
+ * 
+ */
+int main(int argc, char **argv) {
+
+  // constants
+  int nx = 3;
+  int ny = 2;
+  int np = 1;
+
+  // initialize the values of the parameters
+  double *theta = new double[np];
+  theta[0] = 2.0;
+
+  // initialize the point at which to differentiate
+  double *X_ss = new double[nx];
+  X_ss[0] = 1.0;
+  X_ss[1] = 1.0;
+  X_ss[2] = 1.0;
+  
+  // initilize independent and dependent variables
+  adouble *X = new adouble[nx];
+  adouble *Y = new adouble[ny];
+  double *pxy = new double[ny];
+
+  //--------------------------------------------------------------------
+  // A1 : turn on trace
+  trace_on(0);
+
+  // A2.i : load parameters
+  locint* para = new locint[np];
+  for (int i = 0; i < np; ++i) {
+    para[i] = mkparam_idx(theta[i]);
+  }
+  
+  // A2.ii : make shortcuts for parameters
+  #define ALPHAX getparam(para[0]);
+  
+  // A3.i : load indep. values
+  for (int i = 0; i < nx; ++i) {
+    X[i] <<= X_ss[i];
+  }
+
+  // A3.ii : make shortcuts for indep. values
+  adouble x1 = X[0];
+  adouble x2 = X[1];
+  adouble x3 = X[2];
+
+  // A4 : evaluate functions
+  Y[0] = x1 * x2*x2 * x3*x3*x3 * ALPHAX;
+  Y[1] = x1*x1*x1 * x2 * x3*x3 * ALPHAX;
+
+  // A5 : store evaluated for use later???
+  for (int i = 0; i < ny; ++i) {
+    Y[i] >>= pxy[i];
+  }
+
+  // A6 : turn off trace
+  trace_off();
+  //--------------------------------------------------------------------
+  
+  // PART 2: EVALUATING THE DERIVATIVES
+
+  double** S = new double* [nx];
+  for (int i = 0; i < nx; ++i) {
+    S[i] = new double [nx](); // set them all to zero
+    S[i][i] = 1.0;
+  }
+
+  int tensor_length = binomi(nx + 2, 2);
+  printf("number vals = %d\n", tensor_length);
+  double** adolc_tensor = myalloc2(ny, tensor_length);
+  tensor_eval(0, ny, nx, 2, nx, X_ss, adolc_tensor, S);
+
+  
+
+  printf("f : \n");
+  for (int i = 0; i <= nx; ++i) {
+    printf("   ");
+    for (int j = 0; j <= i; ++j) {
+      printf("%3.0f  ", adolc_tensor[0][(i*(i+1)/2)+j]);
+    }
+    printf("\n");
+  }
+  printf("\n");
+
+
+  printf("g : \n");
+  for (int i = 0; i <= nx; ++i) {
+    printf("   ");
+    for (int j = 0; j <= i; ++j) {
+      printf("%3.0f  ", adolc_tensor[1][(i*(i+1)/2)+j]);
+    }
+    printf("\n");
+  }
+  printf("\n");
+
+
+
+
+
+
+  delete[] para;  // locint
+  delete[] Y;     // adouble
+  delete[] X;     // adouble
+  delete[] pxy;   // double
+
+
+  for (int i = 0; i < nx; ++i) {
+    delete[] S[i];
+  }
+  delete[] S;
+
+  delete[] X_ss;  // double
+  delete[] theta; // double
+
+  
+  return 0;
+}

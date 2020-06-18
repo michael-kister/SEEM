@@ -6,10 +6,6 @@
 #include <math.h>
 #include <adolc/adolc.h>
 
-#include <lapacke.h>
-#include <cblas.h>
-
-
 int main(int argc, char **argv) {
 
   /*****************************************************************************
@@ -37,14 +33,14 @@ int main(int argc, char **argv) {
   double  *pxy   = new double  [1*num_variable]; // TODO: verify use!!
 
   // seed matrix
-  double **S = new double* [2*num_variable];
+  double** S = new double* [2*num_variable];
   for (int i = 0; i < 2*num_variable; ++i) {
     S[i] = new double [2*num_variable](); // set them all to zero
     S[i][i] = 1.0;
   }
 
   // tensor containing auto-diff results
-  double **adolc_tensor = new double* [1*num_variable];
+  double** adolc_tensor = new double* [1*num_variable];
   for (int i = 0; i < num_variable; ++i) {
     adolc_tensor[i] = new double [tensor_length];
   }
@@ -177,200 +173,14 @@ int main(int argc, char **argv) {
    * REARRANGING DATA
    ****************************************************************************/
 
-  // first we want a mapping to the indices we want
-
-  int group_size[] = {1,num_state,num_state,num_control,num_control};
-
-  int r, c, ii, jj;
-
-  int ***index_map = new int** [5];
-  for (int i = 0; i < 5; ++i) {
-    index_map[i] = new int* [5];
-    for (int j = 0; j < 5; ++j) {
-      index_map[i][j] = new int [group_size[i] * group_size[j]];
-      for (int u = 0; u < group_size[i]; ++u) {
-	r = u;
-	for (int k = 0; k < i; ++k) { r += group_size[k]; }
-	for (int v = 0; v < group_size[j]; ++v) {
-	  c = v;
-	  for (int k = 0; k < j; ++k) { c += group_size[k]; }
-	  ii = (r > c) ? r : c;
-	  jj = (r > c) ? c : r;
-	  index_map[i][j][group_size[j]*u+v] = (ii*(ii+1)/2)+jj;
-	}
-      }
-    }
-  }
-
-  // then we actually want to construct our necessary arrays
-
-  int block_size;
-  
-  double ***tensor = new double** [5];
-  for (int i = 0; i < 5; ++i) {
-    tensor[i] = new double* [5];
-    for (int j = 0; j < 5; ++j) {
-      block_size = group_size[i] * group_size[j];
-      tensor[i][j] = new double [num_variable * block_size];
-      for (int u = 0; u < num_variable; ++u) {
-	for (int v = 0; v < block_size; ++v) {
-	  tensor[i][j][block_size*u+v] =
-	    adolc_tensor[u][index_map[i][j][v]];
-	}
-      }
-    }
-  }
-  
-  
-  
-  /*****************************************************************************
-   * SOLVE GX HX
-   ****************************************************************************/
-
-  int n = num_variable;
-  int nx = num_state;
-  int ny = num_control;
-
-  double *gx  = new double [ny * nx]();
-  double *hx  = new double [nx * nx]();
-  
-  
-  
-  double A [num_variable * num_variable]; // A = [fxp fyp] (Blocks [2][0] & [4][0])
-  double B [num_variable * num_variable]; // B = [-fx -fy] (Blocks [1][0] & [3][0])
-  
-  
-  for (int i = 0; i < num_variable; ++i) {
-    for (int j = 0; j < num_variable; ++j) {
-      if (j < num_state) {
-	A[num_variable*i+j] =      tensor[2][0][num_state*i+j];
-	B[num_variable*i+j] = -1.0*tensor[1][0][num_state*i+j];
-      } else {
-	A[num_variable*i+j] =      tensor[4][0][num_control*i+j-num_state];
-	B[num_variable*i+j] = -1.0*tensor[3][0][num_control*i+j-num_state];
-      }
-    }
-  }
-  
-  double* Q;         // unused
-  double  Z [n * n]; // definitely used
-  
-  double rconde[2];
-  double rcondv[2];
-  
-  double ar[n];
-  double ai[n];
-  double be[n];
-  
-  lapack_int sdim;
+  // first we want a mapping from the location of our array to the indices of 
 
 
-
-  auto mod_gt_one_lam =
-    [](const double* ar, const double* ai, const double* be) -> lapack_logical {
-      // check that the modulus of (ar+ai)/b is less than one
-      if (sqrt(((*ar)*(*ar)+(*ai)*(*ai))/((*be)*(*be))) > 1)
-	return 1;
-      else
-	return 0;
-    };
-
-
-  
-  /*------------------------------------------------------------*/
-  LAPACKE_dggesx(LAPACK_ROW_MAJOR,'N','V','S', mod_gt_one_lam,'N',
-		 n, A, n, B, n, &sdim, ar, ai, be,
-		 Q, n, Z, n, rconde, rcondv);
-
-  printf("sdim = %d\n", sdim);
-  
-  /*------------------------------------------------------------*/
-  // solve for gx
-  
-  double mz22p [ny * ny];
-  lapack_int ipiv [n];
-  
-  for (int i = nx; i < n; i++)
-    for (int j = nx; j < n; j++)
-      mz22p[ny*(j-nx)+(i-nx)] = -1.0 * Z[n*i+j];
-  
-  for (int i = 0; i < nx; i++)
-    for (int j = nx; j < n; j++)
-      gx[nx*(j-nx)+i] = Z[n*i+j];
-  
-  LAPACKE_dgesv(LAPACK_ROW_MAJOR, ny, nx, mz22p, ny, ipiv, gx, nx);
-  
-  /*------------------------------------------------------------*/
-  // solve for hx
-  
-  double z11p [nx * nx];
-  for (int i = 0; i < nx; i++)
-    for (int j = 0; j < nx; j++)
-      z11p[nx*j+i] = Z[n*i+j];
-  
-  double b11p [nx * nx];
-  for (int i = 0; i < nx; i++)
-    for (int j = 0; j < nx; j++)
-      b11p[nx*j+i] = B[n*i+j];
-  
-  LAPACKE_dgesv(LAPACK_ROW_MAJOR, nx, nx, z11p, nx, ipiv, b11p, nx);
-  
-  double b11_z11 [nx * nx];
-  for (int i = 0; i < nx; i++)
-    for (int j = 0; j < nx; j++)
-      b11_z11[nx*j+i] = b11p[nx*i+j];
-  
-  double a11 [nx * nx];
-  for (int i = 0; i < nx; i++)
-    for (int j = 0; j < nx; j++)
-      a11[nx*i+j] = A[n*i+j];
-  
-  LAPACKE_dgesv(LAPACK_ROW_MAJOR, nx, nx, a11, nx, ipiv, b11_z11, nx);
-  
-  double z11 [nx * nx];
-  for (int i = 0; i < nx; i++)
-    for (int j = 0; j < nx; j++)
-      z11[nx*i+j] = Z[n*i+j];
-  
-  cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nx, nx, nx,
-	      1.0, z11, nx, b11_z11, nx, 0.0, hx, nx);
-  
-  
-  
-  printf("gx:\n");
-  printf("[ %8.4f  %8.4f ]\n\n\n", gx[0], gx[1]);
-  
-  printf("hx:\n");
-  printf("[ %8.4f  %8.4f ]\n[ %8.4f  %8.4f ]\n\n\n",
-	 hx[0], hx[1], hx[2], hx[3]);
-  
-  
-  
   
   /*****************************************************************************
    * CLEAN UP ENVIRONMENT
    ****************************************************************************/
 
-  for (int i = 0; i < 5; ++i) {
-    for (int j = 0; j < 5; ++j) {
-      delete[] index_map[i][j];
-    }
-    delete[] index_map[i];
-  }
-  delete[] index_map;
-  
-  for (int i = 0; i < 5; ++i) {
-    for (int j = 0; j < 5; ++j) {
-      delete[] tensor[i][j];
-    }
-    delete[] tensor[i];
-  }
-  delete[] tensor;
-
-
-
-
-  
   for (int i = 0; i < num_variable; ++i)
     delete[] adolc_tensor[i];
   delete[] adolc_tensor;
