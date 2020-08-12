@@ -9,6 +9,375 @@
 #include <lapacke.h>
 #include <cblas.h>
 
+
+typedef std::vector<int> intvec;
+
+class Index : public intvec {
+public:
+    int dimension;
+    int status;
+    Index(const intvec& i) :
+	intvec{i}, dimension{int(i.size())}, status{1} {}
+
+    void print0(void) const {
+	printf("[");
+	for (int i = 0; i < dimension; ++i)
+	    printf("%d,", this->at(i));
+	printf("\b]");
+    }
+    void print(void) const {
+	this->print0();
+	printf("\n");
+    }
+
+    // TODO: look into rvalue reference?
+    Index Permute(const intvec& P) const {
+	Index out(*this);
+	for (int i = 0; i < dimension; ++i)
+	    out[i] = this->at(P[i]);
+	return out;
+    }
+};
+
+class Tensor {
+public:
+    int dimension;
+    intvec sizes;
+    int length;
+    std::vector<double> X;
+
+    Index& Increment(Index& I) const {
+	for (int d = dimension-1; d >= 0; --d) {
+	    if (I[d] < sizes[d]-1) {
+		++I[d];
+		break;
+	    } else {
+		I[d] = 0;
+		if (d == 0)
+		    I.status = 0;
+	    }
+	}
+	return I;
+    }
+
+    int Address(const Index& I) const {
+	int address = 0;
+	int factor;
+	for (int i = 0; i < dimension; ++i) {
+	    factor = 1;
+	    for (int j = i+1; j < dimension; ++j) {
+		factor *= sizes[j];
+	    }
+	    address += factor * I[i];
+	}
+	return address;
+    }
+    
+    Tensor(const intvec& s_) : sizes(s_) {
+	dimension = sizes.size();
+	length = !!dimension;
+	for (int i = 0; i < dimension; ++i)
+	    length *= sizes[i];
+	X = std::vector<double>(length, 0);
+    }
+    Tensor(void) : Tensor(intvec()) {}
+    //void Symmetrify(void);
+    //void Cleave(const intvec&);
+    //void Fuse(const intvec&);
+    
+    double& operator[](const Index& I) {
+	return X[Address(I)];
+    }
+
+    double  operator[](const Index& I) const {
+	return X[Address(I)];
+    }
+
+    void Permute(const intvec& P) {
+	intvec sz(dimension,0);
+	for (int i = 0; i < dimension; ++i)
+	    sz[i] = sizes[P[i]];
+	Tensor T(sz);
+	for (Index I(intvec(dimension,0)); I.status; Increment(I))
+	    T[I.Permute(P)] = this->operator[](I);
+	
+	std::swap(T, *this);
+    }
+    
+    void FlattenFull(void) {
+
+	// if the dimension is odd, add a vacuous dimension
+	if (dimension % 2) {
+	    sizes.push_back(1);
+	    ++dimension;
+	}
+
+	// create permutation argument, as well as sizes for
+	// new 2D array. P = [0,2,4,6,1,3,5,7]
+	intvec P(dimension,0);
+	intvec s(2,1);
+	for (int i = 0; i < dimension/2; ++i) {
+	    P[i]               = 2*i;
+	    P[i+(dimension/2)] = 2*i+1;
+
+	    s[0] *= sizes[i];
+	    s[1] *= sizes[i+(dimension/2)];
+	}
+
+	// permute array
+	this->Permute(P);
+
+	// now relabel dimensions and sizes
+	this->sizes = s;
+	this->dimension = 2;
+    }
+
+    // only this one can be undone
+    void FlattenPartial(void) {
+	if (dimension % 2) {
+	    sizes.push_back(1);
+	    ++dimension;
+	}
+	intvec P(dimension,0); // P = [0,2,4,6,1,3,5,7]
+	for (int i = 0; i < dimension/2; ++i) {
+	    P[i]               = 2*i;
+	    P[i+(dimension/2)] = 2*i+1;
+	}
+	this->Permute(P);
+    }
+
+    // this can only be done using partial
+    void Unflatten(void) {
+	intvec P(dimension,0);
+	for (int i = 0; i < dimension/2; ++i) {
+	    P[2*i+0] = i+0;
+	    P[2*i+1] = i+dimension/2;
+	}
+	this->Permute(P);
+    }
+    
+    
+    void print0(void) const {
+	for (Index I(intvec(dimension,0)); I.status; Increment(I)) {
+	    printf("S");
+	    I.print0();
+	    printf(" = %f\n", X[Address(I)]);
+	}
+    }
+    /**/
+
+    void print(void) const;
+
+
+    Tensor& operator+=(const Tensor& B) {
+	for (int i = 0; i < length; ++i)
+	    X[i] += B.X[i];
+	return *this;
+    }
+    Tensor& operator-=(const Tensor& B) {
+	for (int i = 0; i < length; ++i)
+	    X[i] -= B.X[i];
+	return *this;
+    }
+
+    Tensor& operator|=(Tensor B) {
+	// Solves for C in the system of linear equations:
+	//     A*C = B,
+	// i.e. the output is equal to A\B.
+
+	// The intention is only for 2D tensors (matrices); for
+	// tensors of higher dimension, the output does not have
+	// an interpretation that is specified here.
+
+	int n    = 1; // # rows of A
+	int k    = 1; // # rows of B (just for checking)
+	int nrhs = 1; // # cols of B
+	int lda  = 1; // leading dimension of A (= # cols of A)
+	int ldb  = 1; // leading dimension of B (= # cols of B)
+
+	while (dimension < B.dimension || dimension % 2) {
+	    sizes.push_back(1);
+	    ++dimension;
+	}
+	while (dimension > B.dimension) {
+	    B.sizes.push_back(1);
+	    ++B.dimension;
+	}
+
+	// gather information about sizes
+	for (int i = 0; i < dimension/2; ++i) {
+	    lda  *=   sizes[2*i+1];
+	    ldb  *= B.sizes[2*i+1];
+	    n    *=   sizes[2*i+0];
+	    k    *= B.sizes[2*i+0];
+	}
+	nrhs = ldb;
+
+	// check for compatibility
+	if (lda != k) {
+	    printf("\nERROR: cannot multiply tensors [");
+	    for (int i = 0; i < dimension; ++i)
+		printf("%d,", sizes[i]);
+	    printf("\b] \\ [");
+	    for (int i = 0; i < B.dimension; ++i)
+		printf("%d,", B.sizes[i]);
+	    printf("\b].\n\n");
+	    abort();
+	}
+
+	// prepare to enter matrix routine
+	this->FlattenPartial();
+	B.FlattenPartial();
+
+	// lapack routine needs this
+	int ipiv[n];
+	
+	// solve linear equations
+	LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs,
+		      &X[0], lda, ipiv, &B.X[0], ldb);
+
+	// undo changes to B
+	B.Unflatten();
+	std::swap(*this, B);
+	return *this;
+    }
+
+    Tensor& operator*=(Tensor B) {
+
+	int lda = 1; // leading dimension of A
+	int ldb = 1; // leading dimension of B
+	int ldc = 1; // leading dimension of C
+	int m   = 1; // # rows of A & C
+	int n   = 1; // # cols of B & C
+	int k   = 1; // # cols of A & rows of C
+
+	while (dimension < B.dimension || dimension % 2) {
+	    sizes.push_back(1);
+	    ++dimension;
+	}
+	while (dimension > B.dimension) {
+	    B.sizes.push_back(1);
+	    ++B.dimension;
+	}
+
+	intvec c_sizes(dimension,0);
+	for (int i = 0; i < dimension/2; ++i) {
+	    // check that dimensions are compatible
+	    if (sizes[2*i+1] != B.sizes[2*i]) {
+		printf("\nERROR: cannot multiply tensors [");
+		for (int j = 0; j < dimension; ++j)
+		    printf("%d,", sizes[j]);
+		printf("\b] × [");
+		for (int j = 0; j < B.dimension; ++j)
+		    printf("%d,", B.sizes[j]);
+		printf("\b].\n\n");
+		abort();
+	    }
+
+	    // store sizes for the output tensor
+	    c_sizes[2*i+0] =   sizes[2*i+0];
+	    c_sizes[2*i+1] = B.sizes[2*i+1];
+
+	    // store some sizes
+	    lda *= sizes[2*i+1];
+	    ldb *= B.sizes[2*i+1];
+	    m *= sizes[2*i+0];
+	    n *= B.sizes[2*i+1];
+	    k *= sizes[2*i+1];
+	}
+	ldc = ldb;
+	
+	// create and output tensor
+	Tensor C(c_sizes);
+
+	// flatten tensors in preparation
+	this->FlattenPartial();
+	B.FlattenPartial();
+	C.FlattenPartial();
+
+	// perform matrix multiplication
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m, n, k,
+		    1.0, &X[0], lda, &B.X[0], ldb, 0.0, &C.X[0], ldc);
+
+	// finish things out
+	C.Unflatten();
+	std::swap(*this, C);
+	return *this;
+    }
+    
+    Tensor& operator*=(double d) {
+	for (int i = 0; i < length; ++i)
+	    X[i] *= d;
+	return *this;
+    }
+
+    Tensor& operator<<=(const Tensor& B) {
+
+	// we're going to make something with double the dimensionality
+	int d = dimension > B.dimension ? dimension : B.dimension;
+	intvec s(2*d,0);
+	for (int i = 0; i < d; ++i) {
+	    s[i]   = i <   dimension ?   sizes[i] : 1;
+	    s[i+d] = i < B.dimension ? B.sizes[i] : 1;
+	}
+	Tensor T(s);
+
+	// we're looking through and performing the Kronecker calculations
+	Index I(intvec(2*d,0));
+	for (Index J(intvec(dimension,0)); J.status; Increment(J)) {
+	    for (Index K(intvec(B.dimension,0)); K.status; B.Increment(K)) {
+		T[I] = X[Address(J)] * B[K];
+		T.Increment(I);
+	    }
+	}
+
+	// now we shuffle the indexing
+	// P = [0,4,1,5,2,6,3,7]
+	intvec P(2*d,0);
+	for (int i = 0; i < d; ++i) {
+	    P[2*i+0] = i+0;
+	    P[2*i+1] = i+d;
+	}
+	T.Permute(P);
+
+	// now we can just relabel the dimensions and their sizes
+	T.sizes = sizes;
+	for (int i = 0; i < B.dimension; ++i)
+	    T.sizes[i] *= B.sizes[i];
+	T.dimension = d;
+
+	// finally, we want the tensor itself back
+	std::swap(*this, T);
+	return *this;
+    }
+
+
+
+    
+};
+inline Tensor operator<<(Tensor A, const Tensor& B) {
+    A <<= B;
+    return A;
+}
+inline Tensor operator* (Tensor A, const Tensor& B) {
+    A *= B;
+    return A;
+}
+inline Tensor operator| (Tensor A, const Tensor& B) {
+    A |= B;
+    return A;
+}
+
+#include "printtensor.cpp"
+
+
+
+
+
+
+
+
+
 void solve_gx_hx
 (double* gx, double* hx, double*** tensor, int num_control, int num_state);
 
@@ -65,6 +434,14 @@ void PrintMatrix(const double* M, int nrow, int ncol) {
     }
     printf("\n");
 }
+
+class Perturbation {
+public:
+    int num_state;
+    int num_control;
+
+    
+};
 
 int main(int argc, char **argv) {
 
