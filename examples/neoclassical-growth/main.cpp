@@ -13,7 +13,7 @@ void solve_gx_hx
 (double* gx, double* hx, double*** tensor, int num_control, int num_state);
 
 void solve_gxx_hxx
-(double* gxx, double* hxx, double*** tensor, int num_control, int num_state,
+(double* gxx, double* hxx, double*** tensor, int ny, int nx,
  const double* gx, const double* hx);
 
 void solve_gss_hss
@@ -527,16 +527,8 @@ void solve_gx_hx
 
 
 void solve_gxx_hxx
-(double* gxx, double* hxx, double*** tensor, int num_control, int num_state,
+(double* gxx, double* hxx, double*** tensor, int ny, int nx,
  const double* gx, const double* hx) {
-
-    //int num_variable = num_control + num_state;
-    
-    //int n = num_variable;
-    int nx = num_state;
-    int ny = num_control;
-
-
 
     auto ghxx_fun =
 	[nx,ny](double* F, double* df, double* kron1, double* kron2,
@@ -562,13 +554,21 @@ void solve_gxx_hxx
 	K[i] = new double [widths[i]*nx];
 
     // set the matrices that are eligible to enter kronecker product
+
+    // K[0] = I
     for (int i = 0; i < nx; i++)
 	for (int j = 0; j < nx; j++)
 	    K[0][nx*i+j] = (i==j) ? 1.0 : 0.0;
+
+    // K[1] = hx
     for (int i = 0; i < nx*nx; i++)
 	K[1][i] = hx[i];
+
+    // K[2] = gx
     for (int i = 0; i < ny*nx; i++)
 	K[2][i] = gx[i];
+
+    // K[3] = gx * hx
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, ny, nx, nx,
 		1.0, gx, nx, hx, nx, 0.0, K[3], nx);
 
@@ -603,29 +603,43 @@ void solve_gxx_hxx
 	for (int j = 0; j < nx*nx; j++)
 	    Ixx[nx*nx*i+j] = (i == j) ? 1.0 : 0.0;
     
+    //--------------------------------------------------------------------------
+    // A = F_{x}
     double A[n*ny];
     //flatten_tensor(derivatives[20], A, n,ny,1,1);
     flatten_tensor(tensor[4][0], A, n,ny,1,1);
 
+    // B = ~(hx << hx)
     double B[nx*nx*nx*nx];
     kronecker_product(B, hx,hx, nx,nx, nx,nx);
     square_transpose(B, nx*nx);
+
+    // BA = B << A
     double BA[xxn*xxy];
     kronecker_product(BA, B, A, nx*nx,nx*nx, n,ny); 
 	
+    //--------------------------------------------------------------------------
+    // C = F_{x'}
     double C[n*ny];
     //flatten_tensor(derivatives[15], C, n,ny,1,1);
     flatten_tensor(tensor[3][0], C, n,ny,1,1);
-    
+
+    // IC = I << C
     double IC[xxn*xxy];
     kronecker_product(IC, Ixx, C, nx*nx,nx*nx, n,ny);
-    
+
+    //--------------------------------------------------------------------------
+    // D = F_{y}
     double D[n*nx];
     //flatten_tensor(derivatives[10], D, n,nx,1,1);
     flatten_tensor(tensor[2][0], D, n,nx,1,1);
+
+    // ID = I << D
     double ID[xxn*xxx];
     kronecker_product(ID, Ixx, D, nx*nx,nx*nx, n,nx);
 
+    //--------------------------------------------------------------------------
+    
     double E[n*nx];
     //cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, nx, ny,
     //		1.0, derivatives[20], ny, gx, nx, 0.0, E, nx);
