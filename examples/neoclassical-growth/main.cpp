@@ -337,20 +337,21 @@ public:
 
 	// now we shuffle the indexing
 	// P = [0,4,1,5,2,6,3,7]
+	/*
 	intvec P(2*d,0);
 	for (int i = 0; i < d; ++i) {
 	    P[2*i+0] = i+0;
 	    P[2*i+1] = i+d;
 	}
 	T.Permute(P);
-
+	*/
 	// now we can just relabel the dimensions and their sizes
-	
+	/*
 	T.sizes = sizes;
 	for (int i = 0; i < B.dimension; ++i)
 	    T.sizes[i] *= B.sizes[i];
 	T.dimension = d;
-	
+	*/
 
 	// finally, we want the tensor itself back
 	std::swap(*this, T);
@@ -927,11 +928,9 @@ void solve_gxx_hxx
 	[nx,ny](double* F, double* df, double* kron1, double* kron2,
 		int r1, int c1, int r2, int c2) -> void
 	{
-	    double kron[r1*r2*c1*c2];
-	    kronecker_product(kron, kron1, kron2, r1, c1, r2, c2);
-	    for (int i = 0; i < r1*r2; ++i) {
+	    for (int i = 0; i < nx+ny; ++i) {
 		for (int j = 0; j < c1*c2; ++j) {
-		    printf("% 7.2f ", kron[c1*c2*i+j]);
+		    printf("% 7.2f ", F[c1*c2*i+j]);
 		}
 		printf("\n");
 	    }
@@ -939,6 +938,15 @@ void solve_gxx_hxx
 	    for (int i = 0; i < nx+ny; ++i) {
 		for (int j = 0; j < r1*r2; ++j) {
 		    printf("% 7.2f ", df[r1*r2*i+j]);
+		}
+		printf("\n");
+	    }
+	    printf("\n");
+	    double kron[r1*r2*c1*c2];
+	    kronecker_product(kron, kron1, kron2, r1, c1, r2, c2);
+	    for (int i = 0; i < r1*r2; ++i) {
+		for (int j = 0; j < c1*c2; ++j) {
+		    printf("% 7.2f ", kron[c1*c2*i+j]);
 		}
 		printf("\n");
 	    }
@@ -1019,16 +1027,20 @@ void solve_gxx_hxx
 
     for (int i = 0; i < 4; i++) {
 	for (int j = 0; j < 4; j++) {
-	    tmp1 = K_T[j] << K_T[i];
-	    //F_T = T2_T[i][j] * (K_T[j] << K_T[i]);
-	    if (i == 0 && j == 0) {
-		K_T[j].print();
+	    //if (i == 0 && j == 2)
+	    //	F_T.print();
+	    F_T += T2_T[j][i] * (K_T[j] << K_T[i]);
+	    /*
+	    if (i == 0 && j == 2) {
+		T2_T[j][i].print();
+		tmp1 = K_T[j] << K_T[i];
 		tmp1.print();
-		//F_T.print();
+		F_T.print();
 	    }
+	    */
 	}
     }
-
+    F_T.print();
 
     for (int k = 0; k < 80; ++k)
 	printf("-");
@@ -1056,16 +1068,16 @@ void solve_gxx_hxx
 		T2.X[k] = flat_derivative[k];
 	    if (verbose > 10) T2.print();
 	    
-	    //ghxx_fun(F, flat_derivative, K[j],K[i], widths[j],nx, widths[i],nx);
-
-	    if (i == 0 && j == 0) {
+	    ghxx_fun(F, flat_derivative, K[j],K[i], widths[j],nx, widths[i],nx);
+	    /*
+	    if (i == 0 && j == 2) {
 	    
 		ghxx_fun2(F, flat_derivative, K[j],K[i], widths[j],nx, widths[i],nx);
 
-		tmp1 = Tensor({nx+ny,nx,1,nx},K[j]);
-		tmp2 = Tensor({nx+ny,nx,1,nx},K[i]);
-		tmp1 <<= tmp2;
-		tmp1.print();
+		//tmp1 = Tensor({nx+ny,nx,1,nx},K[j]);
+		//tmp2 = Tensor({nx+ny,nx,1,nx},K[i]);
+		//tmp1 <<= tmp2;
+		//tmp1.print();
 		Tensor({nx+ny,nx,1,nx},F).print();
 		//F_T0 = Tensor({nx+ny,nx,1,nx},F);
 		//F_T0.print();
@@ -1074,9 +1086,10 @@ void solve_gxx_hxx
 		ghxx_fun(F, flat_derivative, K[j],K[i], widths[j],nx, widths[i],nx);
 
 	    }
+	    */
 	} 
     }
-    
+    Tensor({nx+ny,nx,1,nx},F).print();
     
     // Ft is the negative transpose of F, since we'll want vec(F)
     double* Ft = new double [(nx+ny)*nx*nx];
