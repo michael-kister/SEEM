@@ -923,45 +923,6 @@ void solve_gxx_hxx
 	    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nx+ny, c1*c2, r1*r2,
 			1.0, df, r1*r2, kron, c1*c2, 1.0, F, c1*c2);
 	};
-
-    auto ghxx_fun2 =
-	[nx,ny](double* F, double* df, double* kron1, double* kron2,
-		int r1, int c1, int r2, int c2) -> void
-	{
-	    for (int i = 0; i < nx+ny; ++i) {
-		for (int j = 0; j < c1*c2; ++j) {
-		    printf("% 7.2f ", F[c1*c2*i+j]);
-		}
-		printf("\n");
-	    }
-	    printf("\n");
-	    for (int i = 0; i < nx+ny; ++i) {
-		for (int j = 0; j < r1*r2; ++j) {
-		    printf("% 7.2f ", df[r1*r2*i+j]);
-		}
-		printf("\n");
-	    }
-	    printf("\n");
-	    double kron[r1*r2*c1*c2];
-	    kronecker_product(kron, kron1, kron2, r1, c1, r2, c2);
-	    for (int i = 0; i < r1*r2; ++i) {
-		for (int j = 0; j < c1*c2; ++j) {
-		    printf("% 7.2f ", kron[c1*c2*i+j]);
-		}
-		printf("\n");
-	    }
-	    printf("\n");
-	    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nx+ny, c1*c2, r1*r2,
-			1.0, df, r1*r2, kron, c1*c2, 1.0, F, c1*c2);
-	    for (int i = 0; i < nx+ny; ++i) {
-		for (int j = 0; j < c1*c2; ++j) {
-		    printf("% 7.2f ", F[c1*c2*i+j]);
-		}
-		printf("\n");
-	    }
-	    printf("\n");
-	};
-
     
     //----------------------------------------------------------------------
     // first the fun stuff
@@ -1027,17 +988,7 @@ void solve_gxx_hxx
 
     for (int i = 0; i < 4; i++) {
 	for (int j = 0; j < 4; j++) {
-	    //if (i == 0 && j == 2)
-	    //	F_T.print();
 	    F_T += T2_T[j][i] * (K_T[j] << K_T[i]);
-	    /*
-	    if (i == 0 && j == 2) {
-		T2_T[j][i].print();
-		tmp1 = K_T[j] << K_T[i];
-		tmp1.print();
-		F_T.print();
-	    }
-	    */
 	}
     }
     F_T.print();
@@ -1069,24 +1020,6 @@ void solve_gxx_hxx
 	    if (verbose > 10) T2.print();
 	    
 	    ghxx_fun(F, flat_derivative, K[j],K[i], widths[j],nx, widths[i],nx);
-	    /*
-	    if (i == 0 && j == 2) {
-	    
-		ghxx_fun2(F, flat_derivative, K[j],K[i], widths[j],nx, widths[i],nx);
-
-		//tmp1 = Tensor({nx+ny,nx,1,nx},K[j]);
-		//tmp2 = Tensor({nx+ny,nx,1,nx},K[i]);
-		//tmp1 <<= tmp2;
-		//tmp1.print();
-		Tensor({nx+ny,nx,1,nx},F).print();
-		//F_T0 = Tensor({nx+ny,nx,1,nx},F);
-		//F_T0.print();
-	    } else {
-
-		ghxx_fun(F, flat_derivative, K[j],K[i], widths[j],nx, widths[i],nx);
-
-	    }
-	    */
 	} 
     }
     Tensor({nx+ny,nx,1,nx},F).print();
