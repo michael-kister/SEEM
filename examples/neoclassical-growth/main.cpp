@@ -124,8 +124,8 @@ public:
 	    P[i]               = 2*i;
 	    P[i+(dimension/2)] = 2*i+1;
 
-	    s[0] *= sizes[i];
-	    s[1] *= sizes[i+(dimension/2)];
+	    s[0] *= sizes[2*i];
+	    s[1] *= sizes[2*i+1];
 	}
 
 	// permute array
@@ -992,6 +992,8 @@ void solve_gxx_hxx
 	}
     }
     F_T.print();
+    F_T.FlattenFull();
+    F_T.print();
 
     for (int k = 0; k < 80; ++k)
 	printf("-");
@@ -1000,25 +1002,7 @@ void solve_gxx_hxx
     for (int i = 0; i < 4; i++) {
 	for (int j = 0; j < 4; j++) {
 	    //flatten_tensor(derivatives[5*(i+1)+(j+1)], flat_derivative, nx+ny, widths[i], 1, widths[j]);
-
-	    if (verbose > 10) {
-		for (int k = 0; k < 80; ++k)
-		    printf("-");
-		printf("\n");
-	    }
-
-	    T1 = Tensor({nx+ny,widths[i],1,widths[j]});
-	    for (int k = 0; k < (nx+ny)*widths[i]*widths[j]; ++k)
-		T1.X[k] = tensor[i+1][j+1][k];
-	    if (verbose > 10) T1.print();
-	    
 	    flatten_tensor(tensor[i+1][j+1], flat_derivative, nx+ny, widths[i], 1, widths[j]);
-
-	    T2 = Tensor({1,1,nx+ny,widths[i]*widths[j]});
-	    for (int k = 0; k < (nx+ny)*widths[i]*widths[j]; ++k)
-		T2.X[k] = flat_derivative[k];
-	    if (verbose > 10) T2.print();
-	    
 	    ghxx_fun(F, flat_derivative, K[j],K[i], widths[j],nx, widths[i],nx);
 	} 
     }
