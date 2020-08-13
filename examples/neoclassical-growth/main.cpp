@@ -1181,19 +1181,17 @@ void solve_gxx_hxx
     printf("ID_T: %d x %d x %d x %d\n", ID_T.sizes[0], ID_T.sizes[1], ID_T.sizes[2], ID_T.sizes[3]);
     printf("IE_T: %d x %d x %d x %d\n", IE_T.sizes[0], IE_T.sizes[1], IE_T.sizes[2], IE_T.sizes[3]);
 
-    ID_T += IE_T;
     BA_T += IC_T;
+    ID_T += IE_T;
 
-    ID_T.print();
+    ~BA_T ^= {1,0};
+    ~ID_T ^= {1,0};
+    
+    BA_T.X.insert(BA_T.X.end(), ID_T.X.begin(), ID_T.X.end());
+    BA_T.sizes[0] += ID_T.sizes[0];
+
+    BA_T ^= {1,0};
     BA_T.print();
-
-    ID_T.Permute({3,0,1,2});
-    BA_T.Permute({3,0,1,2});
-    ID_T.X.insert(ID_T.X.end(), BA_T.X.begin(), BA_T.X.end());
-    ID_T.sizes[0] += BA_T.sizes[0];
-    ID_T.Permute({1,2,3,0});
-
-    ID_T.print();
     
     //--------------------------------------------------------------------------
     double G[xxn*xxn];
