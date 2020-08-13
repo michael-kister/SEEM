@@ -123,7 +123,7 @@ public:
 	for (int i = 0; i < dimension/2; ++i) {
 	    P[i]               = 2*i;
 	    P[i+(dimension/2)] = 2*i+1;
-
+	    
 	    s[0] *= sizes[2*i];
 	    s[1] *= sizes[2*i+1];
 	}
@@ -189,23 +189,15 @@ public:
 	//     A*C = B,
 	// i.e. the output is equal to A\B.
 
-	// The CBLAS routine maps:
-	// Bp = A\B.
-	// So if we actually want
-	// Xp = X/Y,
-	// then note that
-	// Xp' = Y'\X'
-
 	// The intention is only for 2D tensors (matrices); for
 	// tensors of higher dimension, the output does not have
 	// an interpretation that is specified here.
 
-	int n    = 1; // # rows of A
-	int k    = 1; // # rows of B (just for checking)
-	int nrhs = 1; // # cols of B
-	int lda  = 1; // leading dimension of A (= # cols of A)
-	int ldb  = 1; // leading dimension of B (= # cols of B)
-
+	int nrow_a = 1;
+	int ncol_a = 1;
+	int nrow_b = 1;
+	int ncol_b = 1;
+	
 	while (dimension < B.dimension || dimension % 2) {
 	    sizes.push_back(1);
 	    ++dimension;
@@ -215,18 +207,17 @@ public:
 	    ++B.dimension;
 	}
 
-	// gather information about sizes
 	for (int i = 0; i < dimension/2; ++i) {
-	    lda  *=   sizes[2*i+1];
-	    ldb  *= B.sizes[2*i+1];
-	    n    *=   sizes[2*i+0];
-	    k    *= B.sizes[2*i+0];
+	    nrow_a *= sizes[2*i];
+	    ncol_a *= sizes[2*i+1];
+	    
+	    nrow_b *= B.sizes[2*i];
+	    ncol_b *= B.sizes[2*i+1];
 	}
-	nrhs = ldb;
-
+	
 	// check for compatibility
-	if (lda != k) {
-	    printf("\nERROR: cannot multiply tensors [");
+	if (ncol_a != nrow_b || ncol_a != nrow_a) {
+	    printf("\nERROR: cannot solve tensors [");
 	    for (int i = 0; i < dimension; ++i)
 		printf("%d,", sizes[i]);
 	    printf("\b] \\ [");
@@ -241,15 +232,73 @@ public:
 	B.FlattenPartial();
 
 	// lapack routine needs this
-	int ipiv[n];
+	int ipiv[nrow_a];
 	
 	// solve linear equations
-	LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs,
-		      &X[0], lda, ipiv, &B.X[0], ldb);
-
+	LAPACKE_dgesv(LAPACK_ROW_MAJOR, nrow_a, ncol_b,
+		      &X[0], ncol_a, ipiv, &B.X[0], ncol_b);
+	
 	// undo changes to B
 	B.Unflatten();
 	std::swap(*this, B);
+	return *this;
+    }
+
+    Tensor& operator/=(Tensor B) {
+	// Solves for C in the system of linear equations:
+	//     A*C = B,
+	// i.e. the output is equal to A\B.
+
+	// The intention is only for 2D tensors (matrices); for
+	// tensors of higher dimension, the output does not have
+	// an interpretation that is specified here.
+
+	int nrow_a = 1;
+	int ncol_a = 1;
+	int nrow_b = 1;
+	int ncol_b = 1;
+	
+	while (dimension < B.dimension || dimension % 2) {
+	    sizes.push_back(1);
+	    ++dimension;
+	}
+	while (dimension > B.dimension) {
+	    B.sizes.push_back(1);
+	    ++B.dimension;
+	}
+
+	for (int i = 0; i < dimension/2; ++i) {
+	    nrow_a *= sizes[2*i];
+	    ncol_a *= sizes[2*i+1];
+	    
+	    nrow_b *= B.sizes[2*i];
+	    ncol_b *= B.sizes[2*i+1];
+	}
+	
+	// check for compatibility
+	if (ncol_a != nrow_b || ncol_b != nrow_b) {
+	    printf("\nERROR: cannot solve tensors [");
+	    for (int i = 0; i < dimension; ++i)
+		printf("%d,", sizes[i]);
+	    printf("\b] / [");
+	    for (int i = 0; i < B.dimension; ++i)
+		printf("%d,", B.sizes[i]);
+	    printf("\b].\n\n");
+	    abort();
+	}
+
+	// prepare to enter matrix routine
+	this->FlattenPartial();
+	B.FlattenPartial();
+
+	// lapack routine needs this
+	int ipiv[ncol_b];
+	
+	// solve linear equations
+	LAPACKE_dgesv(LAPACK_COL_MAJOR, nrow_b, nrow_a,
+		      &B.X[0], ncol_b, ipiv, &X[0], ncol_a);
+	
+	this->Unflatten();
 	return *this;
     }
 
@@ -315,6 +364,16 @@ public:
 	std::swap(*this, C);
 	return *this;
     }
+
+    Tensor& operator^=(const intvec& P) {
+	this->Permute(P);
+	return *this;
+    }
+
+    Tensor& operator~() {
+	this->FlattenFull();
+	return *this;
+    }
     
     Tensor& operator*=(double d) {
 	for (int i = 0; i < length; ++i)
@@ -359,12 +418,10 @@ public:
 	    T.sizes[i] *= B.sizes[i];
 	T.dimension = d;
 	*/
-
 	// finally, we want the tensor itself back
 	std::swap(*this, T);
 	return *this;
     }
-
 
 
     
@@ -379,6 +436,14 @@ inline Tensor operator* (Tensor A, const Tensor& B) {
 }
 inline Tensor operator| (Tensor A, const Tensor& B) {
     A |= B;
+    return A;
+}
+inline Tensor operator/ (Tensor A, const Tensor& B) {
+    A /= B;
+    return A;
+}
+inline Tensor operator^ (Tensor A, const intvec& P) {
+    A ^= P;
     return A;
 }
 
