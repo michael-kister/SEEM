@@ -189,6 +189,13 @@ public:
 	//     A*C = B,
 	// i.e. the output is equal to A\B.
 
+	// The CBLAS routine maps:
+	// Bp = A\B.
+	// So if we actually want
+	// Xp = X/Y,
+	// then note that
+	// Xp' = Y'\X'
+
 	// The intention is only for 2D tensors (matrices); for
 	// tensors of higher dimension, the output does not have
 	// an interpretation that is specified here.
@@ -974,8 +981,7 @@ void solve_gxx_hxx
     Tensor T1;
     Tensor T2;
 
-    int verbose = 9;
-
+    
     Tensor T2_T[4][4];
     for (int i = 0; i < 4; ++i) {
 	for (int j = 0; j < 4; ++j) {
@@ -984,7 +990,6 @@ void solve_gxx_hxx
     }
 
     Tensor F_T({nx+ny,nx,1,nx});
-    Tensor tmp1, tmp2;
 
     for (int i = 0; i < 4; i++) {
 	for (int j = 0; j < 4; j++) {
@@ -993,6 +998,8 @@ void solve_gxx_hxx
     }
     F_T.print();
     F_T.FlattenFull();
+    F_T.print();
+    F_T.Permute({1,0});
     F_T.print();
 
     for (int k = 0; k < 80; ++k)
@@ -1026,24 +1033,43 @@ void solve_gxx_hxx
     for (int i = 0; i < nx*nx; i++)
 	for (int j = 0; j < nx*nx; j++)
 	    Ixx[nx*nx*i+j] = (i == j) ? 1.0 : 0.0;
+
+    Tensor Ixx_T({nx*nx,nx*nx},Ixx);
     
     //--------------------------------------------------------------------------
-    // A = F_{x}
+    // A = F_{y'}
     double A[n*ny];
     //flatten_tensor(derivatives[20], A, n,ny,1,1);
     flatten_tensor(tensor[4][0], A, n,ny,1,1);
-
+    //Tensor({n,ny},A).print();
+    
     // B = ~(hx << hx)
     double B[nx*nx*nx*nx];
     kronecker_product(B, hx,hx, nx,nx, nx,nx);
     square_transpose(B, nx*nx);
-
+    Tensor({nx*nx,nx*nx},B).print();
+    
     // BA = B << A
     double BA[xxn*xxy];
     kronecker_product(BA, B, A, nx*nx,nx*nx, n,ny); 
-	
+    //Tensor({nx*nx*n,nx*nx*ny},BA).print();
+
+    printf("Original:\n");
+    //Tensor({nx*nx*n,nx*nx*ny},BA).print();
+    printf("New:\n");
+    Tensor A_T({n,ny}, tensor[4][0]);
+    Tensor B_T = hx_T << hx_T;
+    B_T.FlattenFull();
+    //B_T.print();
+    B_T.Permute({1,0});
+    //B_T.print();
+    Tensor BA_T = B_T << A_T;
+    //A_T.print();
+    //B_T <<= A_T;
+    //B_T.print();
+    
     //--------------------------------------------------------------------------
-    // C = F_{x'}
+    // C = F_{y}
     double C[n*ny];
     //flatten_tensor(derivatives[15], C, n,ny,1,1);
     flatten_tensor(tensor[3][0], C, n,ny,1,1);
@@ -1052,6 +1078,10 @@ void solve_gxx_hxx
     double IC[xxn*xxy];
     kronecker_product(IC, Ixx, C, nx*nx,nx*nx, n,ny);
 
+    Tensor C_T({nx+ny,ny},tensor[3][0]);
+    Tensor IC_T = Ixx_T << C_T;
+    
+    
     //--------------------------------------------------------------------------
     // D = F_{y}
     double D[n*nx];
@@ -1061,6 +1091,10 @@ void solve_gxx_hxx
     // ID = I << D
     double ID[xxn*xxx];
     kronecker_product(ID, Ixx, D, nx*nx,nx*nx, n,nx);
+
+
+    Tensor D_T({nx+ny,nx},tensor[2][0]);
+    Tensor ID_T = Ixx_T << D_T;
 
     //--------------------------------------------------------------------------
     
@@ -1072,11 +1106,41 @@ void solve_gxx_hxx
     double IE[xxn*xxx];
     kronecker_product(IE, Ixx, E, nx*nx,nx*nx, n,nx);
 
+
+    Tensor E_T({nx+ny,nx},tensor[4][0]);
+    E_T *= gx_T;
+    Tensor IE_T = Ixx_T << E_T;
+
+    printf("BA_T: %d x %d x %d x %d\n", BA_T.sizes[0], BA_T.sizes[1], BA_T.sizes[2], BA_T.sizes[3]);
+    printf("IC_T: %d x %d x %d x %d\n", IC_T.sizes[0], IC_T.sizes[1], IC_T.sizes[2], IC_T.sizes[3]);
+    printf("ID_T: %d x %d x %d x %d\n", ID_T.sizes[0], ID_T.sizes[1], ID_T.sizes[2], ID_T.sizes[3]);
+    printf("IE_T: %d x %d x %d x %d\n", IE_T.sizes[0], IE_T.sizes[1], IE_T.sizes[2], IE_T.sizes[3]);
+
+    ID_T += IE_T;
+    BA_T += IC_T;
+
+    ID_T.print();
+    BA_T.print();
+
+    ID_T.Permute({3,0,1,2});
+    BA_T.Permute({3,0,1,2});
+    ID_T.X.insert(ID_T.X.end(), BA_T.X.begin(), BA_T.X.end());
+    ID_T.sizes[0] += BA_T.sizes[0];
+    ID_T.Permute({1,2,3,0});
+
+    ID_T.print();
+    
+    //--------------------------------------------------------------------------
     double G[xxn*xxn];
     for (int i = 0; i < xxn; i++)
 	for (int j = 0; j < xxn; j++)
 	    G[xxn*i+j] = (j < xxy) ? BA[xxy*i+j] + IC[xxy*i+j] : ID[xxx*i+j-xxy] + IE[xxx*i+j-xxy];
     
+
+    Tensor({1,1,xxn,xxn},G).print();
+
+
+
     lapack_int ipiv[xxn];
     LAPACKE_dgesv(LAPACK_ROW_MAJOR, xxn, 1, G, xxn, ipiv, Ft, 1);
     
