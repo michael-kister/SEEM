@@ -511,7 +511,7 @@ void PrintMatrix(const double* M, int nrow, int ncol) {
 	}
 	printf("]\n");
     }
-    printf("\n");
+    //printf("\n");
 }
 
 class Perturbation {
@@ -524,9 +524,9 @@ public:
 
 int main(int argc, char **argv) {
 
-    /*****************************************************************************
+    /***************************************************************************
      * SET UP ENVIRONMENT
-     ****************************************************************************/
+     **************************************************************************/
 
     // constants
     int num_state   = 2; // number of "non-jump" variables
@@ -567,9 +567,9 @@ int main(int argc, char **argv) {
     }
   
 
-    /*****************************************************************************
+    /***************************************************************************
      * OBTAIN STEADY STATE
-     ****************************************************************************/
+     **************************************************************************/
 
     // set parameter values
     double beta  = 0.9896;
@@ -609,11 +609,11 @@ int main(int argc, char **argv) {
     X_ss[7] = c_ss;
 
   
-    /*****************************************************************************
+    /***************************************************************************
      * AUTOMATIC DIFFERENTIATION
-     ****************************************************************************/
+     **************************************************************************/
 
-    // Step 1 ....................................................... turn on trace
+    // Step 1 .................................................... turn on trace
     trace_on(0);
 
     // Step 2 : load parameters
@@ -621,7 +621,7 @@ int main(int argc, char **argv) {
 	para[i] = mkparam_idx(theta[i]);
     }
   
-    // Step 3 ....................................... make shortcuts for parameters
+    // Step 3 .................................... make shortcuts for parameters
 #define BETA_X getparam(para[0])
 #define TAU__X getparam(para[1])
 #define THETAX getparam(para[2])
@@ -630,7 +630,7 @@ int main(int argc, char **argv) {
 #define RHO__X getparam(para[5])
 #define SIGMAX getparam(para[6])
   
-    // Step 4 ...................................... register independent variables
+    // Step 4 ................................... register independent variables
     X[0] <<= k_ss; // current states
     X[1] <<= z_ss;
     X[2] <<= k_ss; // future states
@@ -640,7 +640,7 @@ int main(int argc, char **argv) {
     X[6] <<= l_ss; // future policy
     X[7] <<= c_ss;
 
-    // Step 5 ...................................... make shortcuts for ind. values
+    // Step 5 ................................... make shortcuts for ind. values
     adouble k_t    = X[0]; // current states
     adouble z_t    = X[1];
     adouble k_tp1  = X[2]; // future states
@@ -650,7 +650,7 @@ int main(int argc, char **argv) {
     adouble l_tp1  = X[6]; // future policy
     adouble c_tp1  = X[7];
   
-    // Step 6 ..................................... construct some helper variables
+    // Step 6 .................................. construct some helper variables
 
     adouble eq1_lhs   = pow(pow(c_t  ,THETAX)*pow(1-l_t  ,1-THETAX),1-TAU__X)*THETAX/c_t  ;
     adouble eq1_rhs_1 = pow(pow(c_tp1,THETAX)*pow(1-l_tp1,1-THETAX),1-TAU__X)*THETAX/c_tp1;
@@ -665,30 +665,31 @@ int main(int argc, char **argv) {
     adouble eq4_lhs = z_tp1;
     adouble eq4_rhs = RHO__X*z_t;
   
-    // Step 6 ...................................... write out our target equations
+    // Step 6 ................................... write out our target equations
 
     Y[0] = eq1_lhs - BETA_X * eq1_rhs_1 * eq1_rhs_2;
     Y[1] = eq2_lhs - eq2_rhs;
     Y[2] = eq3_lhs - eq3_rhs;
     Y[3] = eq4_lhs - eq4_rhs;
   
-    // Step 7 .................................... store evaluated for use later???
+    // Step 7 ................................. store evaluated for use later???
     for (int i = 0; i < num_variable; ++i)
 	Y[i] >>= pxy[i];
 
-    // Step 8 ...................................................... turn off trace
+    // Step 8 ................................................... turn off trace
     trace_off();
-  
-    // Step 9 ................................... perform automatic differentiation
+    
+    // Step 9 ................................ perform automatic differentiation
     tensor_eval(0, num_variable, 2*num_variable, 2,
 		2*num_variable, X_ss, adolc_tensor, S);
 
   
-    /*****************************************************************************
+    /***************************************************************************
      * ANALYSIS
-     ****************************************************************************/
+     **************************************************************************/
 
-    printf("\nl_ss : %7.4f\n", l_ss);
+    printf("\nSteady-States:\n");
+    printf("l_ss : %7.4f\n", l_ss);
     printf("c_ss : %7.4f\n", c_ss);
     printf("k_ss : %7.4f\n", k_ss);
     printf("z_ss : %7.4f\n\n", z_ss);
@@ -712,9 +713,9 @@ int main(int argc, char **argv) {
     }
     */
 
-    /*****************************************************************************
+    /***************************************************************************
      * REARRANGING DATA
-     ****************************************************************************/
+     **************************************************************************/
 
     // first we want a mapping to the indices we want
 
@@ -762,9 +763,9 @@ int main(int argc, char **argv) {
   
   
   
-    /*****************************************************************************
+    /***************************************************************************
      * SOLVE GX HX
-     ****************************************************************************/
+     **************************************************************************/
     //int n = num_variable;
     int nx = num_state;
     int ny = num_control;
@@ -775,35 +776,41 @@ int main(int argc, char **argv) {
     solve_gx_hx(gx, hx, tensor, num_control, num_state);
 
   
+    printf("gx: (lt, ct) (measurement)\n");
+    PrintMatrix(gx, num_control, num_state);
+    Tensor({1,1,ny,nx},gx).print();
+    printf("\n");
   
     printf("hx: (kt, zt) (transition)\n");
     PrintMatrix(hx, num_state, num_state);
-  
-    printf("gx: (lt, ct) (measurement)\n");
-    PrintMatrix(gx, num_control, num_state);
-  
-    /*****************************************************************************
+    Tensor({1,1,nx,nx},hx).print();
+    printf("\n");
+
+
+    /***************************************************************************
      * SOLVE GXX, HXX, GSS, HSS.
-     ****************************************************************************/
+     **************************************************************************/
 
     double *gxx = new double [ny * nx * nx]();
     double *hxx = new double [nx * nx * nx]();
-    //double *gss = new double [ny]();
-    //double *hss = new double [nx]();
-
     solve_gxx_hxx(gxx, hxx, tensor, num_control, num_state, gx, hx);
-  
-    printf("hxx: (kt, zt) (transition)\n");
-    PrintMatrix(hxx, num_state*num_state, num_state);
   
     printf("gxx: (lt, ct) (measurement)\n");
     PrintMatrix(gxx, num_control*num_state, num_state);
+    Tensor({ny,nx,1,nx},gxx).print();
+    printf("\n");
 
+    printf("hxx: (kt, zt) (transition)\n");
+    PrintMatrix(hxx, num_state*num_state, num_state);
+    Tensor({nx,nx,1,nx},hxx).print();
+    printf("\n");
+
+    
+
+    
+    /*
     int num_shock = 1;
-    double eta[num_state*num_shock];
-    eta[0] = 0;
-    eta[1] = 1;
-
+    double eta[] = {0,1};
     double *gss = new double [ny]();
     double *hss = new double [nx]();
     solve_gss_hss(gss, hss, tensor, num_control, num_state, num_shock, gx, gxx, eta);
@@ -813,6 +820,8 @@ int main(int argc, char **argv) {
   
     printf("gss: (lt, ct) (measurement)\n");
     PrintMatrix(gss, num_control, 1);
+    */
+    
     
     
   
@@ -923,8 +932,10 @@ void solve_gx_hx
 		   n, A, n, B, n, &sdim, ar, ai, be,
 		   Q, n, Z, n, rconde, rcondv);
 
-    printf("There were %d explosive eigenvalues.\n", sdim);
+
     if (sdim != num_control) {
+	printf("There were %d explosive eigenvalues, ", sdim);
+	printf("while there should have been %d.\n", num_control);
 	printf("Uh oh...\n");
 	abort();
     }
@@ -1061,15 +1072,19 @@ void solve_gxx_hxx
 	    F_T += T2_T[j][i] * (K_T[j] << K_T[i]);
 	}
     }
-    F_T.print();
-    F_T.FlattenFull();
-    F_T.print();
-    F_T.Permute({1,0});
-    F_T.print();
+    //F_T.print();
+    //F_T.FlattenFull();
+    //F_T.print();
+    //printf("My F_T:\n");
+    //(~F_T).print();
+    ~F_T;
+    //F_T.print();
+    //F_T.Permute({1,0});
+    //F_T.print();
 
-    for (int k = 0; k < 80; ++k)
-	printf("-");
-    printf("\n");
+    //for (int k = 0; k < 80; ++k)
+    //	printf("-");
+    //printf("\n");
     
     for (int i = 0; i < 4; i++) {
 	for (int j = 0; j < 4; j++) {
@@ -1078,7 +1093,8 @@ void solve_gxx_hxx
 	    ghxx_fun(F, flat_derivative, K[j],K[i], widths[j],nx, widths[i],nx);
 	} 
     }
-    Tensor({nx+ny,nx,1,nx},F).print();
+    //printf("Original F:\n");
+    //Tensor({nx+ny,nx,1,nx},F).print();
     
     // Ft is the negative transpose of F, since we'll want vec(F)
     double* Ft = new double [(nx+ny)*nx*nx];
@@ -1112,16 +1128,16 @@ void solve_gxx_hxx
     double B[nx*nx*nx*nx];
     kronecker_product(B, hx,hx, nx,nx, nx,nx);
     square_transpose(B, nx*nx);
-    Tensor({nx*nx,nx*nx},B).print();
+    //Tensor({nx*nx,nx*nx},B).print();
     
     // BA = B << A
     double BA[xxn*xxy];
     kronecker_product(BA, B, A, nx*nx,nx*nx, n,ny); 
     //Tensor({nx*nx*n,nx*nx*ny},BA).print();
 
-    printf("Original:\n");
+    //printf("Original:\n");
     //Tensor({nx*nx*n,nx*nx*ny},BA).print();
-    printf("New:\n");
+    //printf("New:\n");
     Tensor A_T({n,ny}, tensor[4][0]);
     Tensor B_T = hx_T << hx_T;
     B_T.FlattenFull();
@@ -1176,10 +1192,10 @@ void solve_gxx_hxx
     E_T *= gx_T;
     Tensor IE_T = Ixx_T << E_T;
 
-    printf("BA_T: %d x %d x %d x %d\n", BA_T.sizes[0], BA_T.sizes[1], BA_T.sizes[2], BA_T.sizes[3]);
-    printf("IC_T: %d x %d x %d x %d\n", IC_T.sizes[0], IC_T.sizes[1], IC_T.sizes[2], IC_T.sizes[3]);
-    printf("ID_T: %d x %d x %d x %d\n", ID_T.sizes[0], ID_T.sizes[1], ID_T.sizes[2], ID_T.sizes[3]);
-    printf("IE_T: %d x %d x %d x %d\n", IE_T.sizes[0], IE_T.sizes[1], IE_T.sizes[2], IE_T.sizes[3]);
+    //printf("BA_T: %d x %d x %d x %d\n", BA_T.sizes[0], BA_T.sizes[1], BA_T.sizes[2], BA_T.sizes[3]);
+    //printf("IC_T: %d x %d x %d x %d\n", IC_T.sizes[0], IC_T.sizes[1], IC_T.sizes[2], IC_T.sizes[3]);
+    //printf("ID_T: %d x %d x %d x %d\n", ID_T.sizes[0], ID_T.sizes[1], ID_T.sizes[2], ID_T.sizes[3]);
+    //printf("IE_T: %d x %d x %d x %d\n", IE_T.sizes[0], IE_T.sizes[1], IE_T.sizes[2], IE_T.sizes[3]);
 
     BA_T += IC_T;
     ID_T += IE_T;
@@ -1191,7 +1207,8 @@ void solve_gxx_hxx
     BA_T.sizes[0] += ID_T.sizes[0];
 
     BA_T ^= {1,0};
-    BA_T.print();
+
+
     
     //--------------------------------------------------------------------------
     double G[xxn*xxn];
@@ -1200,12 +1217,21 @@ void solve_gxx_hxx
 	    G[xxn*i+j] = (j < xxy) ? BA[xxy*i+j] + IC[xxy*i+j] : ID[xxx*i+j-xxy] + IE[xxx*i+j-xxy];
     
 
-    Tensor({1,1,xxn,xxn},G).print();
-
-
-
+    //Tensor({1,1,xxn,xxn},G).print();
+    //BA_T.print();
+    //printf("Ft:\n");
+    //Tensor({xxn,1},Ft).print();
+    
+    (F_T ^= {1,0}) *= -1;
+    F_T.sizes[0] *= F_T.sizes[1];
+    F_T.sizes[1] = 1;
+    
     lapack_int ipiv[xxn];
     LAPACKE_dgesv(LAPACK_ROW_MAJOR, xxn, 1, G, xxn, ipiv, Ft, 1);
+    
+    BA_T |= F_T;
+    //BA_T.print();
+    //Tensor({1,1,xxn,1},Ft).print();
     
 
     //----------------------------------------------------------------------
@@ -1214,10 +1240,81 @@ void solve_gxx_hxx
     for (int i = 0; i < ny; i++)
 	for (int j = 0; j < nx*nx; j++)
 	    gxx[nx*nx*i+j] = Ft[ny*j+i];
+
+    //printf("gxx = \n");
+    //Tensor({1,1,ny,nx*nx},gxx).print();
+    //Tensor gxx__({ny,nx,1,nx},&BA_T.X[0]);
+    //asdf ^= {2,3,0,1};
+    //asdf.print();
     
     for (int i = 0; i < nx; i++)
 	for (int j = 0; j < nx*nx; j++)
 	    hxx[nx*nx*i+j] = Ft[nx*j+i+ny*nx*nx];
+
+    /*
+    //printf("hxx = \n");
+    //Tensor({1,1,nx,nx*nx},hxx).print();
+    Tensor hxx__({nx,nx,1,nx},&BA_T.X[nx*nx*ny]);
+
+
+    printf("\nhxx = \n");
+    Tensor({1,1,nx,nx*nx},hxx).print();
+
+    double xss_[] = {23.14, 0.001};
+    Tensor({1,1,nx,1},xss_).print();
+    double xkx_[4];
+    for (int i = 0; i < 2; ++i)
+	for (int j = 0; j < 2; ++j)
+	    xkx_[2*i+j] = xss_[i] * xss_[j];
+    Tensor({1,1,nx*nx,1},xkx_).print();
+    
+    double xp_[] = {0,0};
+
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nx, 1, nx*nx,
+		1.0, hxx, nx*nx, xkx_, 1, 0.0, xp_, 1);
+    Tensor({1,1,nx,1},xp_).print();
+
+    printf("try with tensors:\n");
+    Tensor x__({nx,1}, xss_);
+    //x__ <<= x__;
+    x__.print();
+
+    Tensor xp__ = hxx__ * (x__ << x__);
+    xp__.print();
+
+
+    abort();
+    */
+    /*
+    printf("\ngxx = \n");
+    Tensor({1,1,ny,nx*nx},gxx).print();
+
+    double x_test[] = {23.14, 0.5};
+    double x_k_x[4];
+    for (int i = 0; i < 2; ++i)
+	for (int j = 0; j < 2; ++j)
+	    x_k_x[2*i+j] = x_test[i] * x_test[j];
+    Tensor({1,1,nx*nx,1},x_k_x).print();
+    
+    double y_test[] = {0,0};
+
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nx, 1, nx*nx,
+		1.0, gxx, nx*nx, x_k_x, 1, 0.0, y_test, 1);
+    Tensor({1,1,nx,1},y_test).print();
+
+    printf("try with tensors:\n");
+    Tensor x__({nx,1}, x_test);
+    //x__ <<= x__;
+    x__.print();
+
+    Tensor ttt = gxx__ * (x__ << x__);
+    ttt.print();
+    */
+
+
+
+    
+        
 
     
 }
