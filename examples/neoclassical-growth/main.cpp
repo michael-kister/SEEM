@@ -808,7 +808,8 @@ int main(int argc, char **argv) {
     double *gxx = new double [ny * nx * nx]();
     double *hxx = new double [nx * nx * nx]();
     solve_gxx_hxx(gxx, hxx, tensor, num_control, num_state, gx, hx);
-  
+
+    
     printf("gxx: (lt, ct) (measurement)\n");
     PrintMatrix(gxx, num_control, num_state*num_state);
     Tensor gxx_T({ny,nx,1,nx},gxx); gxx_T.print();
@@ -819,6 +820,7 @@ int main(int argc, char **argv) {
     Tensor hxx_T({nx,nx,1,nx},hxx); hxx_T.print();
     printf("\n");
     
+    /*
     int num_shock = 1;
     double eta[] = {0,1};
     double *gss = new double [ny]();
@@ -832,13 +834,14 @@ int main(int argc, char **argv) {
     printf("hss: (kt, zt) (transition)\n");
     PrintMatrix(hss, num_state, 1);
     Tensor hss_T({nx,1},hss); hss_T.print(); 
-    
+    */
   
     
     /***************************************************************************
      * Test Steady State
      **************************************************************************/
 
+    /*
     printf("\n\n\n");
     double xt[] = {0.05, 0.05};
 
@@ -886,6 +889,7 @@ int main(int argc, char **argv) {
     Tensor xtp1_T = xss_T + (hx_T * dx_T) + (0.5*((hxx_T)*(dx_T << dx_T)));
     printf("xtp1 from Tensor:\n");
     xtp1_T.print();
+    */
     
   
     /*****************************************************************************
@@ -1293,16 +1297,29 @@ void solve_gxx_hxx
     LAPACKE_dgesv(LAPACK_ROW_MAJOR, xxn, 1, G, xxn, ipiv, Ft, 1);
     
     BA_T |= F_T;
-    //BA_T.print();
-    //Tensor({1,1,xxn,1},Ft).print();
+    BA_T.print();
+    Tensor({1,1,xxn,1},Ft).print();
     
 
     //----------------------------------------------------------------------
     // allocate the top xxy to gxx, and the bottom xxx to hxx
+    printf("\n\n============================\n");
 
     for (int i = 0; i < ny; i++)
 	for (int j = 0; j < nx*nx; j++)
 	    gxx[nx*nx*i+j] = Ft[ny*j+i];
+
+    for (int i = 0; i < nx; i++)
+	for (int j = 0; j < nx*nx; j++)
+	    hxx[nx*nx*i+j] = Ft[(ny*nx*nx)+nx*j+i];
+
+    Tensor gxx_T({nx,1,nx,ny},Ft);
+    gxx_T ^= {1,0,3,2};
+    gxx_T.print();
+
+    Tensor hxx_T({nx,1,nx,nx},&Ft[ny*nx*nx]);
+    hxx_T ^= {1,0,3,2};
+    hxx_T.print();
 
     //printf("gxx = \n");
     //Tensor({1,1,ny,nx*nx},gxx).print();
@@ -1310,19 +1327,18 @@ void solve_gxx_hxx
     //asdf ^= {2,3,0,1};
     //asdf.print();
     
-    for (int i = 0; i < nx; i++)
-	for (int j = 0; j < nx*nx; j++)
-	    hxx[nx*nx*i+j] = Ft[nx*j+i+ny*nx*nx];
-
-    /*
+    
     //printf("hxx = \n");
     //Tensor({1,1,nx,nx*nx},hxx).print();
-    Tensor hxx__({nx,nx,1,nx},&BA_T.X[nx*nx*ny]);
+    // we transposed it, so now going along the 1D array causes
+    // us to fill first 
+    //Tensor hxx__({nx,nx,1,nx},&BA_T.X[nx*nx*ny]);
 
+    //printf("hxx = \n");
+    //Tensor({1,1,nx,nx*nx},hxx).print();
+    //hxx__.print();
 
-    printf("\nhxx = \n");
-    Tensor({1,1,nx,nx*nx},hxx).print();
-
+    /*
     double xss_[] = {23.14, 0.001};
     Tensor({1,1,nx,1},xss_).print();
     double xkx_[4];
@@ -1344,10 +1360,10 @@ void solve_gxx_hxx
 
     Tensor xp__ = hxx__ * (x__ << x__);
     xp__.print();
-
-
-    abort();
     */
+
+
+
     /*
     printf("\ngxx = \n");
     Tensor({1,1,ny,nx*nx},gxx).print();
@@ -1378,7 +1394,7 @@ void solve_gxx_hxx
 
     
         
-
+    printf("============================\n\n\n");
     
 }
 
