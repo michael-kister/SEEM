@@ -1314,11 +1314,11 @@ void solve_gxx_hxx
 	    hxx[nx*nx*i+j] = Ft[(ny*nx*nx)+nx*j+i];
 
     Tensor gxx_T({nx,1,nx,ny},Ft);
-    gxx_T ^= {1,0,3,2};
+    gxx_T ^= {3,0,1,2};
     gxx_T.print();
 
     Tensor hxx_T({nx,1,nx,nx},&Ft[ny*nx*nx]);
-    hxx_T ^= {1,0,3,2};
+    hxx_T ^= {3,0,1,2};
     hxx_T.print();
 
     //printf("gxx = \n");
