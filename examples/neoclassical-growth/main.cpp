@@ -476,9 +476,12 @@ inline Tensor operator^ (Tensor A, const intvec& P) {
 void solve_gx_hx
 (double* gx, double* hx, double*** tensor, int num_control, int num_state);
 
+//void solve_gxx_hxx
+//(double* gxx, double* hxx, double*** tensor, int ny, int nx,
+// const double* gx, const double* hx);
 void solve_gxx_hxx
-(double* gxx, double* hxx, double*** tensor, int ny, int nx,
- const double* gx, const double* hx);
+(Tensor& gxx_T, Tensor& hxx_T, double*** tensor, int ny, int nx,
+ const Tensor& gx_T, const Tensor& hx_T);
 
 void solve_gss_hss
 (double* gss, double* hss, double*** tensor, int num_control, int num_state, int neps,
@@ -805,19 +808,21 @@ int main(int argc, char **argv) {
      * SOLVE GXX, HXX, GSS, HSS.
      **************************************************************************/
 
-    double *gxx = new double [ny * nx * nx]();
-    double *hxx = new double [nx * nx * nx]();
-    solve_gxx_hxx(gxx, hxx, tensor, num_control, num_state, gx, hx);
+    Tensor gxx_T({ny,nx,1,nx});
+    Tensor hxx_T({nx,nx,1,nx});
+    solve_gxx_hxx(gxx_T, hxx_T, tensor, num_control, num_state, gx_T, hx_T);
 
     
     printf("gxx: (lt, ct) (measurement)\n");
-    PrintMatrix(gxx, num_control, num_state*num_state);
-    Tensor gxx_T({ny,nx,1,nx},gxx); gxx_T.print();
+    //PrintMatrix(gxx, num_control, num_state*num_state);
+    //Tensor gxx_T({ny,nx,1,nx},gxx);
+    gxx_T.print();
     printf("\n");
 
     printf("hxx: (kt, zt) (transition)\n");
-    PrintMatrix(hxx, num_state, num_state*num_state);
-    Tensor hxx_T({nx,nx,1,nx},hxx); hxx_T.print();
+    //PrintMatrix(hxx, num_state, num_state*num_state);
+    //Tensor hxx_T({nx,nx,1,nx},hxx);
+    hxx_T.print();
     printf("\n");
     
     /*
@@ -934,8 +939,8 @@ int main(int argc, char **argv) {
 
     delete[] gx;
     delete[] hx;
-    delete[] gxx;
-    delete[] hxx;
+    //delete[] gxx;
+    //delete[] hxx;
   
     return 0;
 }
@@ -1061,8 +1066,8 @@ void solve_gx_hx
 
 
 void solve_gxx_hxx
-(double* gxx, double* hxx, double*** tensor, int ny, int nx,
- const double* gx, const double* hx) {
+(Tensor& gxx_T, Tensor& hxx_T, double*** tensor, int ny, int nx,
+ const Tensor& gx_T, const Tensor& hx_T) {
 
     int widths[] = {1,nx,nx,ny,ny};
 
@@ -1072,14 +1077,7 @@ void solve_gxx_hxx
 	    I_T.X[nx*i+j] = (i==j) ? 1.0 : 0.0;
     Tensor Ixx_T = ~(I_T << I_T);
 
-    //=======================
-    Tensor hx_T({nx,nx}, hx);
-    Tensor gx_T({ny,nx}, gx);
-    //=======================
-
-
     Tensor K_T[4] = {I_T, hx_T, gx_T, gx_T*hx_T};
-    
     
     //=====================================
     // this needs to be moved outside
@@ -1120,11 +1118,11 @@ void solve_gxx_hxx
     BA_T |= F_T;
 
     // now assign results
-    Tensor gxx_T({nx,1,nx,ny},&BA_T.X[0]);
+    gxx_T = Tensor({nx,1,nx,ny},&BA_T.X[0]);
     gxx_T ^= {3,0,1,2};
     gxx_T.print();
 
-    Tensor hxx_T({nx,1,nx,nx},&BA_T.X[ny*nx*nx]);
+    hxx_T = Tensor({nx,1,nx,nx},&BA_T.X[ny*nx*nx]);
     hxx_T ^= {3,0,1,2};
     hxx_T.print();
 }
