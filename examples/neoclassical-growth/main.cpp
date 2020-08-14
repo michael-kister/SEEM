@@ -430,6 +430,22 @@ inline Tensor operator<<(Tensor A, const Tensor& B) {
     A <<= B;
     return A;
 }
+inline Tensor operator+ (Tensor A, const Tensor& B) {
+    A += B;
+    return A;
+}
+inline Tensor operator- (Tensor A, const Tensor& B) {
+    A -= B;
+    return A;
+}
+inline Tensor operator* (Tensor A, double d) {
+    A *= d;
+    return A;
+}
+inline Tensor operator* (double d, Tensor A) {
+    A *= d;
+    return A;
+}
 inline Tensor operator* (Tensor A, const Tensor& B) {
     A *= B;
     return A;
@@ -766,7 +782,7 @@ int main(int argc, char **argv) {
     /***************************************************************************
      * SOLVE GX HX
      **************************************************************************/
-    //int n = num_variable;
+
     int nx = num_state;
     int ny = num_control;
 
@@ -774,18 +790,16 @@ int main(int argc, char **argv) {
     double *hx  = new double [nx * nx]();
   
     solve_gx_hx(gx, hx, tensor, num_control, num_state);
-
   
     printf("gx: (lt, ct) (measurement)\n");
     PrintMatrix(gx, num_control, num_state);
-    Tensor({1,1,ny,nx},gx).print();
+    Tensor gx_T({ny,nx},gx); gx_T.print();
     printf("\n");
   
     printf("hx: (kt, zt) (transition)\n");
     PrintMatrix(hx, num_state, num_state);
-    Tensor({1,1,nx,nx},hx).print();
+    Tensor hx_T({nx,nx},hx); hx_T.print();
     printf("\n");
-
 
     /***************************************************************************
      * SOLVE GXX, HXX, GSS, HSS.
@@ -796,33 +810,82 @@ int main(int argc, char **argv) {
     solve_gxx_hxx(gxx, hxx, tensor, num_control, num_state, gx, hx);
   
     printf("gxx: (lt, ct) (measurement)\n");
-    PrintMatrix(gxx, num_control*num_state, num_state);
-    Tensor({ny,nx,1,nx},gxx).print();
+    PrintMatrix(gxx, num_control, num_state*num_state);
+    Tensor gxx_T({ny,nx,1,nx},gxx); gxx_T.print();
     printf("\n");
 
     printf("hxx: (kt, zt) (transition)\n");
-    PrintMatrix(hxx, num_state*num_state, num_state);
-    Tensor({nx,nx,1,nx},hxx).print();
+    PrintMatrix(hxx, num_state, num_state*num_state);
+    Tensor hxx_T({nx,nx,1,nx},hxx); hxx_T.print();
     printf("\n");
-
     
-
-    
-    /*
     int num_shock = 1;
     double eta[] = {0,1};
     double *gss = new double [ny]();
     double *hss = new double [nx]();
     solve_gss_hss(gss, hss, tensor, num_control, num_state, num_shock, gx, gxx, eta);
 
-    printf("hss: (kt, zt) (transition)\n");
-    PrintMatrix(hss, num_state, 1);
-  
     printf("gss: (lt, ct) (measurement)\n");
     PrintMatrix(gss, num_control, 1);
-    */
+    Tensor gss_T({ny,1},gss); gss_T.print(); 
+
+    printf("hss: (kt, zt) (transition)\n");
+    PrintMatrix(hss, num_state, 1);
+    Tensor hss_T({nx,1},hss); hss_T.print(); 
     
+  
     
+    /***************************************************************************
+     * Test Steady State
+     **************************************************************************/
+
+    printf("\n\n\n");
+    double xt[] = {0.05, 0.05};
+
+    double yt[] = {l_ss, c_ss};
+    Tensor yss_T({ny,1},yt);
+    //Tensor({1,1,ny,1},yt).print();
+    // looping over output variable
+    for (int i = 0; i < ny; ++i) {
+	// looping over first multiplication
+	for (int j = 0; j < nx; ++j) {
+	    yt[i] += gx[nx*i+j]*xt[j];
+	    for (int k = 0; k < nx; ++k) {
+		yt[i] += 0.5*gxx[nx*nx*i+nx*j+k]*xt[j]*xt[k];
+	    }
+	}
+    }
+    printf("yt from arrays:\n");
+    Tensor({1,1,ny,1},yt).print();
+
+
+    double xtp1[] = {k_ss, z_ss};
+    //Tensor({1,1,nx,1},xtp1).print();
+    Tensor xss_T({nx,1},xtp1);
+    // looping over output variable
+    for (int i = 0; i < nx; ++i) {
+	// looping over first multiplication
+	for (int j = 0; j < nx; ++j) {
+	    xtp1[i] += hx[nx*i+j]*xt[j];
+	    for (int k = 0; k < nx; ++k) {
+		xtp1[i] += 0.5*hxx[nx*nx*i+nx*j+k]*xt[j]*xt[k];
+	    }
+	}
+    }
+    printf("xtp1 from arrays:\n");
+    Tensor({1,1,nx,1},xtp1).print();
+
+    printf("\n\n\n");
+
+    Tensor dx_T({nx,1},xt);
+
+    Tensor yt_T = yss_T + (gx_T * dx_T) + (0.5*((gxx_T)*(dx_T << dx_T)));
+    printf("yt from Tensor:\n");
+    yt_T.print();
+    
+    Tensor xtp1_T = xss_T + (hx_T * dx_T) + (0.5*((hxx_T)*(dx_T << dx_T)));
+    printf("xtp1 from Tensor:\n");
+    xtp1_T.print();
     
   
     /*****************************************************************************
