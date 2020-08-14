@@ -476,9 +476,10 @@ inline Tensor operator^ (Tensor A, const intvec& P) {
 void solve_gx_hx
 (double* gx, double* hx, double*** tensor, int num_control, int num_state);
 
-//void solve_gxx_hxx
-//(double* gxx, double* hxx, double*** tensor, int ny, int nx,
-// const double* gx, const double* hx);
+void solve_gxx_hxx
+(double* gxx, double* hxx, double*** tensor, int ny, int nx,
+ const double* gx, const double* hx);
+
 void solve_gxx_hxx
 (Tensor& gxx_T, Tensor& hxx_T, double*** tensor, int ny, int nx,
  const Tensor& gx_T, const Tensor& hx_T);
@@ -1062,6 +1063,149 @@ void solve_gx_hx
   
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nx, nx, nx,
 		1.0, z11, nx, b11_z11, nx, 0.0, hx, nx);
+}
+
+void solve_gxx_hxx
+(double* gxx, double* hxx, double*** tensor, int ny, int nx,
+ const double* gx, const double* hx) {
+
+    auto ghxx_fun =
+	[nx,ny](double* F, double* df, double* kron1, double* kron2,
+		int r1, int c1, int r2, int c2) -> void
+	{
+	    double kron[r1*r2*c1*c2];
+	    kronecker_product(kron, kron1, kron2, r1, c1, r2, c2);
+	    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nx+ny, c1*c2, r1*r2,
+			1.0, df, r1*r2, kron, c1*c2, 1.0, F, c1*c2);
+	};
+    
+    //----------------------------------------------------------------------
+    // first the fun stuff
+
+    // use value-initialization to ensure it starts at zero
+    double F[(nx+ny)*nx*nx] = {0};
+    
+    int widths[] = {nx,nx,ny,ny};
+    
+    double** K = new double* [4];
+    for (int i = 0; i < 4; i++)
+	K[i] = new double [widths[i]*nx];
+
+    // set the matrices that are eligible to enter kronecker product
+
+    // K[0] = I
+    for (int i = 0; i < nx; i++)
+	for (int j = 0; j < nx; j++)
+	    K[0][nx*i+j] = (i==j) ? 1.0 : 0.0;
+
+    // K[1] = hx
+    for (int i = 0; i < nx*nx; i++)
+	K[1][i] = hx[i];
+
+    // K[2] = gx
+    for (int i = 0; i < ny*nx; i++)
+	K[2][i] = gx[i];
+
+    // K[3] = gx * hx
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, ny, nx, nx,
+		1.0, gx, nx, hx, nx, 0.0, K[3], nx);
+
+    // obtain the sum of 16 combinations of
+    int n_tmp = nx > ny ? nx : ny;
+    double flat_derivative[(nx+ny)*n_tmp*n_tmp];
+    for (int i = 0; i < 4; i++) {
+	for (int j = 0; j < 4; j++) {
+	    //flatten_tensor(derivatives[5*(i+1)+(j+1)], flat_derivative, nx+ny, widths[i], 1, widths[j]);
+	    flatten_tensor(tensor[i+1][j+1], flat_derivative, nx+ny, widths[i], 1, widths[j]);
+	    ghxx_fun(F, flat_derivative, K[j],K[i], widths[j],nx, widths[i],nx);
+	} 
+    }
+    
+    // Ft is the negative transpose of F, since we'll want vec(F)
+    double* Ft = new double [(nx+ny)*nx*nx];
+    for (int i = 0; i < nx+ny; i++)
+	for (int j = 0; j < nx*nx; j++)
+	    Ft[(nx+ny)*j+i] = -1.0*F[nx*nx*i+j];
+    
+    //----------------------------------------------------------------------
+    // now the painful stuff... 
+
+    int n = nx+ny;
+    int xxn = nx*nx*n;
+    int xxx = nx*nx*nx;
+    int xxy = nx*nx*ny;
+
+    double Ixx[nx*nx*nx*nx];
+    for (int i = 0; i < nx*nx; i++)
+	for (int j = 0; j < nx*nx; j++)
+	    Ixx[nx*nx*i+j] = (i == j) ? 1.0 : 0.0;
+
+    Tensor Ixx_T({nx*nx,nx*nx},Ixx);
+    
+    //--------------------------------------------------------------------------
+    // A = F_{y'}
+    double A[n*ny];
+    //flatten_tensor(derivatives[20], A, n,ny,1,1);
+    flatten_tensor(tensor[4][0], A, n,ny,1,1);
+    
+    // B = ~(hx << hx)
+    double B[nx*nx*nx*nx];
+    kronecker_product(B, hx,hx, nx,nx, nx,nx);
+    square_transpose(B, nx*nx);
+    
+    // BA = B << A
+    double BA[xxn*xxy];
+    kronecker_product(BA, B, A, nx*nx,nx*nx, n,ny); 
+
+    //--------------------------------------------------------------------------
+    // C = F_{y}
+    double C[n*ny];
+    //flatten_tensor(derivatives[15], C, n,ny,1,1);
+    flatten_tensor(tensor[3][0], C, n,ny,1,1);
+
+    // IC = I << C
+    double IC[xxn*xxy];
+    kronecker_product(IC, Ixx, C, nx*nx,nx*nx, n,ny);
+    
+    //--------------------------------------------------------------------------
+    // D = F_{y}
+    double D[n*nx];
+    //flatten_tensor(derivatives[10], D, n,nx,1,1);
+    flatten_tensor(tensor[2][0], D, n,nx,1,1);
+
+    // ID = I << D
+    double ID[xxn*xxx];
+    kronecker_product(ID, Ixx, D, nx*nx,nx*nx, n,nx);
+
+    //--------------------------------------------------------------------------
+    
+    double E[n*nx];
+    //cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, nx, ny,
+    //		1.0, derivatives[20], ny, gx, nx, 0.0, E, nx);
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, nx, ny,
+		1.0, tensor[4][0], ny, gx, nx, 0.0, E, nx);
+    double IE[xxn*xxx];
+    kronecker_product(IE, Ixx, E, nx*nx,nx*nx, n,nx);
+
+    //--------------------------------------------------------------------------
+    double G[xxn*xxn];
+    for (int i = 0; i < xxn; i++)
+	for (int j = 0; j < xxn; j++)
+	    G[xxn*i+j] = (j < xxy) ? BA[xxy*i+j] + IC[xxy*i+j] : ID[xxx*i+j-xxy] + IE[xxx*i+j-xxy];
+    
+    lapack_int ipiv[xxn];
+    LAPACKE_dgesv(LAPACK_ROW_MAJOR, xxn, 1, G, xxn, ipiv, Ft, 1);
+    
+    //----------------------------------------------------------------------
+    // allocate the top xxy to gxx, and the bottom xxx to hxx
+
+    for (int i = 0; i < ny; i++)
+	for (int j = 0; j < nx*nx; j++)
+	    gxx[nx*nx*i+j] = Ft[ny*j+i];
+
+    for (int i = 0; i < nx; i++)
+	for (int j = 0; j < nx*nx; j++)
+	    hxx[nx*nx*i+j] = Ft[nx*j+i+ny*nx*nx];
 }
 
 
