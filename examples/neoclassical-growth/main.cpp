@@ -423,6 +423,19 @@ public:
 	return *this;
     }
 
+    // post-fix
+    Tensor& operator++(int) {
+	sizes.push_back(1);
+	++dimension;
+	return *this;
+    }
+
+    // pre-fix
+    Tensor& operator++() {
+	sizes.insert(sizes.begin(),1);
+	++dimension;
+	return *this;
+    }
 
     
 };
@@ -795,52 +808,55 @@ int main(int argc, char **argv) {
   
     solve_gx_hx(gx, hx, tensor, num_control, num_state);
   
-    printf("gx: (lt, ct) (measurement)\n");
-    PrintMatrix(gx, num_control, num_state);
-    Tensor gx_T({ny,nx},gx); gx_T.print();
-    printf("\n");
+    //printf("gx: (lt, ct) (measurement)\n");
+    //Tensor({ny,nx},gx).print();
+    //printf("\n");
   
-    printf("hx: (kt, zt) (transition)\n");
-    PrintMatrix(hx, num_state, num_state);
-    Tensor hx_T({nx,nx},hx); hx_T.print();
-    printf("\n");
-
+    //printf("hx: (kt, zt) (transition)\n");
+    //Tensor({nx,nx},hx).print();
+    //printf("\n");
+    
     /***************************************************************************
      * SOLVE GXX, HXX, GSS, HSS.
      **************************************************************************/
 
-    Tensor gxx_T({ny,nx,1,nx});
-    Tensor hxx_T({nx,nx,1,nx});
-    solve_gxx_hxx(gxx_T, hxx_T, tensor, num_control, num_state, gx_T, hx_T);
+    //Tensor gxx_T({ny,nx,1,nx});
+    //Tensor hxx_T({nx,nx,1,nx});
+    //solve_gxx_hxx(gxx_T, hxx_T, tensor, num_control, num_state, gx_T, hx_T);
+    //printf("gxx: (lt, ct) (measurement)\n");
+    //gxx_T.print();
+    //printf("\n");
+    //printf("hxx: (kt, zt) (transition)\n");
+    //hxx_T.print();
+    //printf("\n");
+    
+    double gxx[ny*nx*nx];
+    double hxx[ny*nx*nx];
+    solve_gxx_hxx(gxx, hxx, tensor, num_control, num_state, gx, hx);
+
+    //printf("gxx: (lt, ct) (measurement)\n");
+    //Tensor({ny,nx,1,nx},gxx).print();
+    //printf("\n");
+    
+    //printf("hxx: (kt, zt) (transition)\n");
+    //Tensor({nx,nx,1,nx},hxx).print();
+    //printf("\n");
+    
+
 
     
-    printf("gxx: (lt, ct) (measurement)\n");
-    //PrintMatrix(gxx, num_control, num_state*num_state);
-    //Tensor gxx_T({ny,nx,1,nx},gxx);
-    gxx_T.print();
-    printf("\n");
-
-    printf("hxx: (kt, zt) (transition)\n");
-    //PrintMatrix(hxx, num_state, num_state*num_state);
-    //Tensor hxx_T({nx,nx,1,nx},hxx);
-    hxx_T.print();
-    printf("\n");
-    
-    /*
     int num_shock = 1;
     double eta[] = {0,1};
     double *gss = new double [ny]();
     double *hss = new double [nx]();
     solve_gss_hss(gss, hss, tensor, num_control, num_state, num_shock, gx, gxx, eta);
-
+    
     printf("gss: (lt, ct) (measurement)\n");
-    PrintMatrix(gss, num_control, 1);
-    Tensor gss_T({ny,1},gss); gss_T.print(); 
+    Tensor({ny,1},gss).print(); 
 
     printf("hss: (kt, zt) (transition)\n");
-    PrintMatrix(hss, num_state, 1);
-    Tensor hss_T({nx,1},hss); hss_T.print(); 
-    */
+    Tensor({nx,1},hss).print(); 
+    
   
     
     /***************************************************************************
@@ -1213,14 +1229,17 @@ void solve_gxx_hxx
 (Tensor& gxx_T, Tensor& hxx_T, double*** tensor, int ny, int nx,
  const Tensor& gx_T, const Tensor& hx_T) {
 
+    // save size parameters
     int widths[] = {1,nx,nx,ny,ny};
 
+    // create an identity matrix
     Tensor I_T({nx,nx});
     for (int i = 0; i < nx; i++)
 	for (int j = 0; j < nx; j++)
 	    I_T.X[nx*i+j] = (i==j) ? 1.0 : 0.0;
     Tensor Ixx_T = ~(I_T << I_T);
 
+    // useful container for looping over tensor products
     Tensor K_T[4] = {I_T, hx_T, gx_T, gx_T*hx_T};
     
     //=====================================
@@ -1232,14 +1251,16 @@ void solve_gxx_hxx
     //=====================================
 
     // first the fun stuff
+    // TODO: can i and j be switched?
     Tensor F_T({nx+ny,nx,1,nx});
     for (int i = 0; i < 4; i++)
 	for (int j = 0; j < 4; j++)
 	    F_T += T2_T[j+1][i+1] * (K_T[j] << K_T[i]);
+    
     ((~F_T) ^= {1,0}) *= -1;
     F_T.sizes[0] *= F_T.sizes[1];
     F_T.sizes[1] = 1;
-    
+
     // then the painful stuff
     Tensor B_T = hx_T << hx_T;
     ~B_T ^= {1,0};
@@ -1272,6 +1293,69 @@ void solve_gxx_hxx
 }
 
 
+void solve_gss_hss
+(double* gss, double* hss, double*** tensor, int num_control, int num_state, int neps,
+ const double* gx, const double* gxx, const double* eta)
+{
+    int nx = num_state;
+    int ny = num_control;
+
+    auto ghss_fun_T =
+	[nx,ny](Tensor& F_T, Tensor& df_T, Tensor v1_T, Tensor v2_T) -> void
+	{
+	    v2_T ^= {1,0};
+	    v1_T *= v2_T;
+	    (v1_T++++) ^= {1,2,0,3};
+	    F_T += df_T * v1_T;
+	};
+    Tensor F_T({nx+ny,1});
+    int n = nx+ny;
+    int widths[] = {nx,ny};
+    
+    //=====================================
+    int widths0[] = {1,nx,nx,ny,ny};
+    // this needs to be moved outside
+    Tensor T2_T[5][5];
+    for (int i = 0; i < 5; ++i)
+	for (int j = 0; j < 5; ++j)
+	    T2_T[i][j] = Tensor({nx+ny,widths0[i],1,widths0[j]}, tensor[i][j]);
+    //=====================================
+
+    Tensor eta_T({nx,neps},eta);
+    Tensor gx_T({ny,nx},gx);
+    Tensor V_T[] = {eta_T, gx_T*eta_T};
+    
+    for (int i = 0; i < 2; i++) // dx', dy'
+	for (int j = 0; j < 2; j++) // dx', dy'
+	    ghss_fun_T(F_T, T2_T[2*j+2][2*i+2], V_T[i], V_T[j]);
+
+    Tensor gxx_T({ny,nx,1,nx},gxx);
+    Tensor ee_T = eta_T * (eta_T ^ intvec({1,0}));
+    (ee_T++++) ^= {0,2,1,3};
+    F_T += T2_T[4][0] * gxx_T * ee_T;
+    F_T *= -1;
+
+    Tensor AB_T = T2_T[4][0] + T2_T[3][0];
+    Tensor CD_T = (T2_T[4][0]*gx_T) + T2_T[2][0];
+    ~AB_T ^= {1,0};
+    ~CD_T ^= {1,0};
+    
+    AB_T.X.insert(AB_T.X.end(), CD_T.X.begin(), CD_T.X.end());
+    AB_T.sizes[0] += CD_T.sizes[0];
+    AB_T ^= {1,0};
+
+    AB_T |= F_T;
+
+    Tensor gss_T = Tensor({1,1,1,ny},&AB_T.X[0]);
+    gss_T ^= {3,0,1,2};
+    gss_T.print();
+    
+    Tensor hss_T = Tensor({1,1,1,nx},&AB_T.X[ny*1*1]);
+    hss_T ^= {3,0,1,2};
+    hss_T.print();
+}
+
+/*
 void solve_gss_hss
 (double* gss, double* hss, double*** tensor, int num_control, int num_state, int neps,
  const double* gx, const double* gxx, const double* eta)
@@ -1353,3 +1437,4 @@ void solve_gss_hss
 	hss[i] = F[i+ny];
 
 }
+*/
