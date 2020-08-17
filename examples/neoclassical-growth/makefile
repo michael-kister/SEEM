@@ -20,10 +20,10 @@ xmain : main.cpp libtensor.a
 libtensor.a : index.o tensor.o
 	ar rc $@ $^
 
-index.o : index.cpp index.h
+index.o : index.cpp index.hpp
 	$(CXX) $(CFLAGS) $(IFLAGS) -c -o $@ $<
 
-tensor.o : tensor.cpp tensor.h index.cpp index.h
+tensor.o : tensor.cpp tensor.hpp index.cpp index.hpp
 	$(CXX) $(CFLAGS) $(IFLAGS) -c -o $@ $<
 
 clean :

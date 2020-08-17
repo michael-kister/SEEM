@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 // Index class
-#include "index.h"
+#include "index.hpp"
 
 // linear algebra
 #include <lapacke.h>

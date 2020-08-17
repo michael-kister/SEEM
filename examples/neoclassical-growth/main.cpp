@@ -6,7 +6,7 @@
 #include <math.h>
 #include <adolc/adolc.h>
 
-#include "tensor.h"
+#include "tensor.hpp"
 
 
 
