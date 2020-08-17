@@ -8,8 +8,19 @@
 
 #include "tensor.hpp"
 
+
+
+
+#include "perturbation.hpp"
+#include "perturbation.cpp"
+
+
+#include "perturbation_manager.cpp"
 /*
-class Perturbation {
+
+// this has all the solution and estimation methods, but requires a
+// descendant to specify the ADOL-C routine.
+class Perturbation : public PerturbationManager {
 
     // Only called from public "Solve" method
     void solve_gx_hx(void);
@@ -19,20 +30,46 @@ class Perturbation {
 public:
     
     // specification parameters
-    int num_state, num_control, num_shock, num_param;
     int approximation_level;
 
     // Member tensors
-    Tensor derivatives;
-    Tensor gx, hx, gxx, hxx, gss, hss;
+    Tensor derivatives[5][5];
+    Tensor yss, xss, gx, hx, gxx, hxx, gss, hss;
 
     // Solve the model
-    void Solve(void);    
+    void Solve(void);
+
+    // virtual function because we don't know what the model looks like
+    virtual void PerformAutomaticDifferentiation(void) = 0;
+
+    // we'll need to evaluate this as a functor
+    void operator()(void) const;
+
+    // update the parameters, which also calls solution routine
+    void UpdateParameters(double* P);
+
+    
+    
+};
+
+class NeoclassicalPerturbation : public Perturbation {
+
+    // Keep these here for convenience
+    int num_s = 2; // number of states
+    int num_c = 2; // number of controls
+    int num_e = 1; // number of shocks
+    int num_p = 8; // number of parameters
+    
+public:
+    
+    Neoclassical(void) : Perturbation(num_s,num_c,num_e,num_p) {}
+
+    void PerformAutomaticDifferentiation(void) {
+	
+    }
+    
 };
 */
-
-#include "perturbation.hpp"
-#include "perturbation.cpp"
 
 int main(int argc, char **argv) {
 
@@ -56,13 +93,13 @@ int main(int argc, char **argv) {
     int tensor_length = binomi(2*num_variable + degree, degree);
 
     // initilize independent and dependent variables
-    double  *theta = new double  [num_param];
-    double  *X_ss  = new double  [2*num_variable]; // steady states for location
+    double  *parameters = new double  [num_param];
+    double  *xss_xss_yss_yss  = new double  [2*num_variable]; // steady states for location
 
     // storage for ADOL-C
-    adouble *X     = new adouble [2*num_variable]; // includes two times
-    adouble *Y     = new adouble [1*num_variable]; // half as many equations
-    locint  *para  = new locint  [num_param];
+    adouble *X_ad     = new adouble [2*num_variable]; // includes two times
+    adouble *Y_ad     = new adouble [1*num_variable]; // half as many equations
+    locint  *param_loc  = new locint  [num_param];
     double  *pxy   = new double  [1*num_variable]; // TODO: verify use!!
 
     // seed matrix
@@ -93,13 +130,13 @@ int main(int argc, char **argv) {
     double sigma = 0.007;
   
     // store them all together
-    theta[0] = beta;
-    theta[1] = tau;
-    theta[2] = thxta;
-    theta[3] = alpha;
-    theta[4] = delta;
-    theta[5] = rho;
-    theta[6] = sigma;
+    parameters[0] = beta;
+    parameters[1] = tau;
+    parameters[2] = thxta;
+    parameters[3] = alpha;
+    parameters[4] = delta;
+    parameters[5] = rho;
+    parameters[6] = sigma;
 
     // obtain steady states
     double Phi = pow(((1/beta)-1+delta)/alpha,1/(alpha-1));
@@ -111,55 +148,56 @@ int main(int argc, char **argv) {
     double z_ss = 0;
   
     // store them all together
-    X_ss[0] = k_ss; // current states
-    X_ss[1] = z_ss;
-    X_ss[2] = k_ss; // future states
-    X_ss[3] = z_ss;
-    X_ss[4] = l_ss; // current policy
-    X_ss[5] = c_ss;
-    X_ss[6] = l_ss; // future policy
-    X_ss[7] = c_ss;
+    xss_xss_yss_yss[0] = k_ss; // current states
+    xss_xss_yss_yss[1] = z_ss;
+    xss_xss_yss_yss[2] = k_ss; // future states
+    xss_xss_yss_yss[3] = z_ss;
+    xss_xss_yss_yss[4] = l_ss; // current policy
+    xss_xss_yss_yss[5] = c_ss;
+    xss_xss_yss_yss[6] = l_ss; // future policy
+    xss_xss_yss_yss[7] = c_ss;
   
     /***************************************************************************
      * AUTOMATIC DIFFERENTIATION
      **************************************************************************/
 
+    double pxxy;
     // Step 1 .................................................... turn on trace
     trace_on(0);
 
     // Step 2 : load parameters
     for (int i = 0; i < num_param; ++i) {
-	para[i] = mkparam_idx(theta[i]);
+	param_loc[i] = mkparam_idx(parameters[i]);
     }
   
     // Step 3 .................................... make shortcuts for parameters
-#define BETA_X getparam(para[0])
-#define TAU__X getparam(para[1])
-#define THETAX getparam(para[2])
-#define ALPHAX getparam(para[3])
-#define DELTAX getparam(para[4])
-#define RHO__X getparam(para[5])
-#define SIGMAX getparam(para[6])
+#define BETA_X getparam(param_loc[0])
+#define TAU__X getparam(param_loc[1])
+#define THETAX getparam(param_loc[2])
+#define ALPHAX getparam(param_loc[3])
+#define DELTAX getparam(param_loc[4])
+#define RHO__X getparam(param_loc[5])
+#define SIGMAX getparam(param_loc[6])
   
     // Step 4 ................................... register independent variables
-    X[0] <<= k_ss; // current states
-    X[1] <<= z_ss;
-    X[2] <<= k_ss; // future states
-    X[3] <<= z_ss;
-    X[4] <<= l_ss; // current policy
-    X[5] <<= c_ss;
-    X[6] <<= l_ss; // future policy
-    X[7] <<= c_ss;
+    X_ad[0] <<= k_ss; // current states
+    X_ad[1] <<= z_ss;
+    X_ad[2] <<= k_ss; // future states
+    X_ad[3] <<= z_ss;
+    X_ad[4] <<= l_ss; // current policy
+    X_ad[5] <<= c_ss;
+    X_ad[6] <<= l_ss; // future policy
+    X_ad[7] <<= c_ss;
 
     // Step 5 ................................... make shortcuts for ind. values
-    adouble k_t    = X[0]; // current states
-    adouble z_t    = X[1];
-    adouble k_tp1  = X[2]; // future states
-    adouble z_tp1  = X[3];
-    adouble l_t    = X[4]; // current policy
-    adouble c_t    = X[5];
-    adouble l_tp1  = X[6]; // future policy
-    adouble c_tp1  = X[7];
+    adouble k_t    = X_ad[0]; // current states
+    adouble z_t    = X_ad[1];
+    adouble k_tp1  = X_ad[2]; // future states
+    adouble z_tp1  = X_ad[3];
+    adouble l_t    = X_ad[4]; // current policy
+    adouble c_t    = X_ad[5];
+    adouble l_tp1  = X_ad[6]; // future policy
+    adouble c_tp1  = X_ad[7];
   
     // Step 6 .................................. construct some helper variables
 
@@ -178,22 +216,31 @@ int main(int argc, char **argv) {
   
     // Step 6 ................................... write out our target equations
 
-    Y[0] = eq1_lhs - BETA_X * eq1_rhs_1 * eq1_rhs_2;
-    Y[1] = eq2_lhs - eq2_rhs;
-    Y[2] = eq3_lhs - eq3_rhs;
-    Y[3] = eq4_lhs - eq4_rhs;
+    Y_ad[0] = eq1_lhs - BETA_X * eq1_rhs_1 * eq1_rhs_2;
+    Y_ad[1] = eq2_lhs - eq2_rhs;
+    Y_ad[2] = eq3_lhs - eq3_rhs;
+    Y_ad[3] = eq4_lhs - eq4_rhs;
   
     // Step 7 ................................. store evaluated for use later???
     for (int i = 0; i < num_variable; ++i)
-	Y[i] >>= pxy[i];
+	Y_ad[i] >>= pxxy;//pxy[i];
 
     // Step 8 ................................................... turn off trace
     trace_off();
     
     // Step 9 ................................ perform automatic differentiation
     tensor_eval(0, num_variable, 2*num_variable, 2,
-		2*num_variable, X_ss, adolc_tensor, S);
+		2*num_variable, xss_xss_yss_yss, adolc_tensor, S);
 
+    // Step 10 ................................... un-define parameter shortcuts
+    
+#undef BETA_X
+#undef TAU__X
+#undef THETAX
+#undef ALPHAX
+#undef DELTAX
+#undef RHO__X
+#undef SIGMAX
   
     /***************************************************************************
      * ANALYSIS
@@ -230,8 +277,8 @@ int main(int argc, char **argv) {
 
     // first we want a mapping to the indices we want
 
-    int group_size[] = {1,num_state,num_state,num_control,num_control};
 
+    int group_size[] = {1,num_state,num_state,num_control,num_control};
     int r, c, ii, jj;
 
     int ***index_map = new int** [5];
@@ -279,7 +326,8 @@ int main(int argc, char **argv) {
     for (int i = 0; i < 5; ++i)
 	for (int j = 0; j < 5; ++j)
 	    derivatives_T[i][j] = Tensor
-		({num_state+num_control,widths[i],1,widths[j]},derivatives[i][j]);
+		({num_state+num_control,widths[i],1,widths[j]},
+		 derivatives[i][j]);
 
   
   
@@ -294,19 +342,12 @@ int main(int argc, char **argv) {
   
     Tensor gx_T({ny,nx},gx);
     Tensor hx_T({nx,nx},hx);
-
     printf("gx: (lt, ct) (measurement)\n");
     gx_T.print(); 
-
     printf("hx: (lt, ct) (measurement)\n");
     hx_T.print(); 
 
-    //printf("\n");
-  
-    //printf("hx: (kt, zt) (transition)\n");
-    //Tensor({nx,nx},hx).print();
-    //printf("\n");
-    
+
     /***************************************************************************
      * SOLVE GXX, HXX, GSS, HSS.
      **************************************************************************/
@@ -314,44 +355,13 @@ int main(int argc, char **argv) {
     Tensor gxx_T({ny,nx,1,nx});
     Tensor hxx_T({nx,nx,1,nx});
     solve_gxx_hxx(gxx_T, hxx_T, derivatives_T, num_control, num_state, gx_T, hx_T);
-
     printf("gxx: (lt, ct) (measurement)\n");
     gxx_T.print(); 
-
     printf("hxx: (lt, ct) (measurement)\n");
     hxx_T.print(); 
 
-
-
-    //printf("gxx: (lt, ct) (measurement)\n");
-    //gxx_T.print();
-    //printf("\n");
-    //printf("hxx: (kt, zt) (transition)\n");
-    //hxx_T.print();
-    //printf("\n");
-    
-    //double gxx[ny*nx*nx];
-    //double hxx[ny*nx*nx];
-    //solve_gxx_hxx(gxx, hxx, tensor, num_control, num_state, gx, hx);
-
-    //printf("gxx: (lt, ct) (measurement)\n");
-    //Tensor({ny,nx,1,nx},gxx).print();
-    //printf("\n");
-    
-    //printf("hxx: (kt, zt) (transition)\n");
-    //Tensor({nx,nx,1,nx},hxx).print();
-    //printf("\n");
-    
-
-
-    
     int num_shock = 1;
-    //double eta[] = {0,1};
-    //double *gss = new double [ny]();
-    //double *hss = new double [nx]();
-
     int neps = 1;
-    
     Tensor gss_T({ny,1,1,1});
     Tensor hss_T({ny,1,1,1});
     Tensor eta_T({nx,neps});
@@ -360,15 +370,10 @@ int main(int argc, char **argv) {
 
     solve_gss_hss(gss_T, hss_T, derivatives_T, num_control, num_state, num_shock,
 		  gx_T, gxx_T, eta_T);
-    
     printf("gss: (lt, ct) (measurement)\n");
     gss_T.print(); 
-
     printf("hss: (lt, ct) (measurement)\n");
     hss_T.print(); 
-
-    //printf("hss: (kt, zt) (transition)\n");
-    //Tensor({nx,1},hss).print(); 
     
   
     
@@ -460,17 +465,18 @@ int main(int argc, char **argv) {
     delete[] S;
 
     delete[] pxy;
-    delete[] para;
-    delete[] Y;
-    delete[] X;
+    delete[] param_loc;
+    delete[] Y_ad;
+    delete[] X_ad;
 
-    delete[] X_ss;
-    delete[] theta;
+    delete[] xss_xss_yss_yss;
+    delete[] parameters;
 
     delete[] gx;
     delete[] hx;
     //delete[] gxx;
     //delete[] hxx;
-  
+
+
     return 0;
 }
