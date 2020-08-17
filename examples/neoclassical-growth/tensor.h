@@ -1,7 +1,16 @@
 #ifndef TENSOR_H
 #define TENSOR_H
 
+// for abort
+#include <stdlib.h>
+
+// Index class
 #include "index.h"
+
+// linear algebra
+#include <lapacke.h>
+#include <cblas.h>
+
 
 class Tensor {
 public:
@@ -53,14 +62,14 @@ public:
     Tensor& operator++(int);                 // add dimension to end
     
 };
-inline Tensor operator+ (Tensor A, const Tensor& B);
-inline Tensor operator- (Tensor A, const Tensor& B);
-inline Tensor operator* (Tensor A, double d);
-inline Tensor operator* (double d, Tensor A);
-inline Tensor operator* (Tensor A, const Tensor& B);
-inline Tensor operator| (Tensor A, const Tensor& B);
-inline Tensor operator/ (Tensor A, const Tensor& B);
-inline Tensor operator<<(Tensor A, const Tensor& B);
-inline Tensor operator^ (Tensor A, const intvec& P);
+Tensor operator+ (Tensor A, const Tensor& B);
+Tensor operator- (Tensor A, const Tensor& B);
+Tensor operator* (Tensor A, double d);
+Tensor operator* (double d, Tensor A);
+Tensor operator* (Tensor A, const Tensor& B);
+Tensor operator| (Tensor A, const Tensor& B);
+Tensor operator/ (Tensor A, const Tensor& B);
+Tensor operator<<(Tensor A, const Tensor& B);
+Tensor operator^ (Tensor A, const intvec& P);
 
 #endif

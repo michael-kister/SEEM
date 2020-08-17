@@ -411,21 +411,21 @@ Tensor& Tensor::operator*=
     return *this;
 }
 
-Tensor& operator^=
+Tensor& Tensor::operator^=
 (const intvec& P)
 {
     this->Permute(P);
     return *this;
 }
 
-Tensor& operator~
+Tensor& Tensor::operator~
 ()
 {
     this->FlattenFull();
     return *this;
 }
-    
-Tensor& operator*=
+
+Tensor& Tensor::operator*=
 (double d)
 {
     for (int i = 0; i < length; ++i)
@@ -477,63 +477,63 @@ Tensor& Tensor::operator++
     return *this;
 }
 
-inline Tensor Tensor::operator<<
+Tensor operator<<
 (Tensor A, const Tensor& B)
 {
     A <<= B;
     return A;
 }
 
-inline Tensor Tensor::operator+
+Tensor operator+
 (Tensor A, const Tensor& B)
 {
     A += B;
     return A;
 }
 
-inline Tensor Tensor::operator-
+Tensor operator-
 (Tensor A, const Tensor& B)
 {
     A -= B;
     return A;
 }
 
-inline Tensor Tensor::operator*
+Tensor operator*
 (Tensor A, double d)
 {
     A *= d;
     return A;
 }
 
-inline Tensor Tensor::operator*
+Tensor operator*
 (double d, Tensor A)
 {
     A *= d;
     return A;
 }
 
-inline Tensor Tensor::operator*
+Tensor operator*
 (Tensor A, const Tensor& B)
 {
     A *= B;
     return A;
 }
 
-inline Tensor Tensor::operator|
+Tensor operator|
 (Tensor A, const Tensor& B)
 {
     A |= B;
     return A;
 }
 
-inline Tensor Tensor::operator/
+Tensor operator/
 (Tensor A, const Tensor& B)
 {
     A /= B;
     return A;
 }
 
-inline Tensor Tensor::operator^
+Tensor operator^
 (Tensor A, const intvec& P)
 {
     A ^= P;

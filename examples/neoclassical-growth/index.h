@@ -1,6 +1,9 @@
 #ifndef INDEX_H
 #define INDEX_H
 
+#include <stdio.h>
+#include <vector>
+
 typedef std::vector<int> intvec;
 
 class Index : public intvec {
