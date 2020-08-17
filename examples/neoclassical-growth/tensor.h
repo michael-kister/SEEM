@@ -1,22 +1,7 @@
-typedef std::vector<int> intvec;
+#ifndef TENSOR_H
+#define TENSOR_H
 
-class Index : public intvec {
-public:
-
-    // Members
-    int dimension;
-    int status;
-
-    // Constructor
-    Index(const intvec& i);
-
-    // Methods for displaying an index
-    void print0(void) const;
-    void print(void) const;
-
-    // Re-order elements of an index
-    Index Permute(const intvec& P) const;
-};
+#include "index.h"
 
 class Tensor {
 public:
@@ -78,4 +63,4 @@ inline Tensor operator/ (Tensor A, const Tensor& B);
 inline Tensor operator<<(Tensor A, const Tensor& B);
 inline Tensor operator^ (Tensor A, const intvec& P);
 
-#include "printtensor.cpp"
+#endif
