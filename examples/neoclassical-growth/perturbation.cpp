@@ -1,7 +1,7 @@
 #include "perturbation.hpp"
 
 void solve_gx_hx
-(double* gx, double* hx, double*** tensor, int num_control, int num_state)
+(double* gx, double* hx, double*** dF, int num_control, int num_state)
 {
     int num_variable = num_state + num_control;
 
@@ -16,11 +16,11 @@ void solve_gx_hx
     for (int i = 0; i < num_variable; ++i) {
 	for (int j = 0; j < num_variable; ++j) {
 	    if (j < num_state) {
-		A[num_variable*i+j] =      tensor[2][0][num_state*i+j];
-		B[num_variable*i+j] = -1.0*tensor[1][0][num_state*i+j];
+		A[num_variable*i+j] =      dF[2][0][num_state*i+j];
+		B[num_variable*i+j] = -1.0*dF[1][0][num_state*i+j];
 	    } else {
-		A[num_variable*i+j] =      tensor[4][0][num_control*i+j-num_state];
-		B[num_variable*i+j] = -1.0*tensor[3][0][num_control*i+j-num_state];
+		A[num_variable*i+j] =      dF[4][0][num_control*i+j-num_state];
+		B[num_variable*i+j] = -1.0*dF[3][0][num_control*i+j-num_state];
 	    }
 	}
     }
@@ -117,11 +117,11 @@ void solve_gx_hx
 }
 
 void solve_gxx_hxx
-(Tensor& gxx_T, Tensor& hxx_T, double*** tensor, int ny, int nx,
+(Tensor& gxx_T, Tensor& hxx_T, Tensor (&dF_T)[5][5], int ny, int nx,
  const Tensor& gx_T, const Tensor& hx_T) {
 
     // save size parameters
-    int widths[] = {1,nx,nx,ny,ny};
+    //int widths[] = {1,nx,nx,ny,ny};
 
     // create an identity matrix
     Tensor I_T({nx,nx});
@@ -135,10 +135,10 @@ void solve_gxx_hxx
     
     //=====================================
     // this needs to be moved outside
-    Tensor T2_T[5][5];
-    for (int i = 0; i < 5; ++i)
-	for (int j = 0; j < 5; ++j)
-	    T2_T[i][j] = Tensor({nx+ny,widths[i],1,widths[j]}, tensor[i][j]);
+    //Tensor dF_T[5][5];
+    //for (int i = 0; i < 5; ++i)
+    //	for (int j = 0; j < 5; ++j)
+    //	    dF_T[i][j] = Tensor({nx+ny,widths[i],1,widths[j]}, tensor[i][j]);
     //=====================================
 
     // first the fun stuff
@@ -146,7 +146,7 @@ void solve_gxx_hxx
     Tensor F_T({nx+ny,nx,1,nx});
     for (int i = 0; i < 4; i++)
 	for (int j = 0; j < 4; j++)
-	    F_T += T2_T[j+1][i+1] * (K_T[j] << K_T[i]);
+	    F_T += dF_T[j+1][i+1] * (K_T[j] << K_T[i]);
     
     ((~F_T) ^= {1,0}) *= -1;
     F_T.sizes[0] *= F_T.sizes[1];
@@ -155,10 +155,10 @@ void solve_gxx_hxx
     // then the painful stuff
     Tensor B_T = hx_T << hx_T;
     ~B_T ^= {1,0};
-    Tensor BA_T = B_T   << T2_T[4][0];
-    Tensor IC_T = Ixx_T << T2_T[3][0];
-    Tensor ID_T = Ixx_T << T2_T[2][0];
-    Tensor IE_T = Ixx_T << (T2_T[4][0] * gx_T);
+    Tensor BA_T = B_T   << dF_T[4][0];
+    Tensor IC_T = Ixx_T << dF_T[3][0];
+    Tensor ID_T = Ixx_T << dF_T[2][0];
+    Tensor IE_T = Ixx_T << (dF_T[4][0] * gx_T);
 
     BA_T += IC_T;
     ID_T += IE_T;
@@ -184,7 +184,7 @@ void solve_gxx_hxx
 }
 
 void solve_gss_hss
-(Tensor& gss_T, Tensor& hss_T, double*** tensor, int num_control, int num_state, int neps,
+(Tensor& gss_T, Tensor& hss_T, Tensor (&dF_T)[5][5], int num_control, int num_state, int neps,
  const Tensor& gx_T, const Tensor& gxx_T, const Tensor& eta_T)
 {
     int nx = num_state;
@@ -203,12 +203,12 @@ void solve_gss_hss
     //int widths[] = {nx,ny};
     
     //=====================================
-    int widths0[] = {1,nx,nx,ny,ny};
+    //int widths0[] = {1,nx,nx,ny,ny};
     // this needs to be moved outside
-    Tensor T2_T[5][5];
-    for (int i = 0; i < 5; ++i)
-	for (int j = 0; j < 5; ++j)
-	    T2_T[i][j] = Tensor({nx+ny,widths0[i],1,widths0[j]}, tensor[i][j]);
+    //Tensor dF_T[5][5];
+    //for (int i = 0; i < 5; ++i)
+    //for (int j = 0; j < 5; ++j)
+    //    dF_T[i][j] = Tensor({nx+ny,widths0[i],1,widths0[j]}, tensor[i][j]);
     //=====================================
 
     //Tensor eta_T({nx,neps},eta);
@@ -217,16 +217,16 @@ void solve_gss_hss
     
     for (int i = 0; i < 2; i++) // dx', dy'
 	for (int j = 0; j < 2; j++) // dx', dy'
-	    ghss_fun_T(F_T, T2_T[2*j+2][2*i+2], V_T[i], V_T[j]);
+	    ghss_fun_T(F_T, dF_T[2*j+2][2*i+2], V_T[i], V_T[j]);
 
     //Tensor gxx_T({ny,nx,1,nx},gxx);
     Tensor ee_T = eta_T * (eta_T ^ intvec({1,0}));
     (ee_T++++) ^= {0,2,1,3};
-    F_T += T2_T[4][0] * gxx_T * ee_T;
+    F_T += dF_T[4][0] * gxx_T * ee_T;
     F_T *= -1;
 
-    Tensor AB_T = T2_T[4][0] + T2_T[3][0];
-    Tensor CD_T = (T2_T[4][0]*gx_T) + T2_T[2][0];
+    Tensor AB_T = dF_T[4][0] + dF_T[3][0];
+    Tensor CD_T = (dF_T[4][0]*gx_T) + dF_T[2][0];
     ~AB_T ^= {1,0};
     ~CD_T ^= {1,0};
     

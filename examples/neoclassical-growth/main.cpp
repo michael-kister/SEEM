@@ -257,36 +257,41 @@ int main(int argc, char **argv) {
 
     int block_size;
   
-    double ***tensor = new double** [5];
+    double ***derivatives = new double** [5];
     for (int i = 0; i < 5; ++i) {
-	tensor[i] = new double* [5];
+	derivatives[i] = new double* [5];
 	for (int j = 0; j < 5; ++j) {
 	    block_size = group_size[i] * group_size[j];
-	    tensor[i][j] = new double [num_variable * block_size];
+	    derivatives[i][j] = new double [num_variable * block_size];
 	    for (int u = 0; u < num_variable; ++u) {
 		for (int v = 0; v < block_size; ++v) {
-		    tensor[i][j][block_size*u+v] =
+		    derivatives[i][j][block_size*u+v] =
 			adolc_tensor[u][index_map[i][j][v]];
 		}
 	    }
 	}
     }
-  
+
+    int nx = num_state;
+    int ny = num_control;
+    int widths[] = {1,nx,nx,ny,ny};
+    Tensor derivatives_T[5][5];
+    for (int i = 0; i < 5; ++i)
+	for (int j = 0; j < 5; ++j)
+	    derivatives_T[i][j] = Tensor
+		({num_state+num_control,widths[i],1,widths[j]},derivatives[i][j]);
+
   
   
     /***************************************************************************
      * SOLVE GX HX
      **************************************************************************/
 
-    int nx = num_state;
-    int ny = num_control;
 
     double *gx  = new double [ny * nx]();
     double *hx  = new double [nx * nx]();
+    solve_gx_hx(gx, hx, derivatives, num_control, num_state);
   
-    solve_gx_hx(gx, hx, tensor, num_control, num_state);
-  
-    //printf("gx: (lt, ct) (measurement)\n");
     Tensor gx_T({ny,nx},gx);
     Tensor hx_T({nx,nx},hx);
 
@@ -308,7 +313,7 @@ int main(int argc, char **argv) {
 
     Tensor gxx_T({ny,nx,1,nx});
     Tensor hxx_T({nx,nx,1,nx});
-    solve_gxx_hxx(gxx_T, hxx_T, tensor, num_control, num_state, gx_T, hx_T);
+    solve_gxx_hxx(gxx_T, hxx_T, derivatives_T, num_control, num_state, gx_T, hx_T);
 
     printf("gxx: (lt, ct) (measurement)\n");
     gxx_T.print(); 
@@ -353,7 +358,7 @@ int main(int argc, char **argv) {
     eta_T.X[0] = 0;
     eta_T.X[1] = 1;
 
-    solve_gss_hss(gss_T, hss_T, tensor, num_control, num_state, num_shock,
+    solve_gss_hss(gss_T, hss_T, derivatives_T, num_control, num_state, num_shock,
 		  gx_T, gxx_T, eta_T);
     
     printf("gss: (lt, ct) (measurement)\n");
@@ -436,11 +441,11 @@ int main(int argc, char **argv) {
   
     for (int i = 0; i < 5; ++i) {
 	for (int j = 0; j < 5; ++j) {
-	    delete[] tensor[i][j];
+	    delete[] derivatives[i][j];
 	}
-	delete[] tensor[i];
+	delete[] derivatives[i];
     }
-    delete[] tensor;
+    delete[] derivatives;
 
 
 
