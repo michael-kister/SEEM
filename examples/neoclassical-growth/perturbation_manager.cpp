@@ -63,8 +63,8 @@ public:
 	int tensor_length = LocalBinomialCoefficient(2*num_variable + degree, degree);
 
 	// one-dimensional arrays
-	gx = new double [num_control*num_state];
-	hx = new double [num_state*num_state];
+	gx = new double [num_control*num_state]();
+	hx = new double [num_state*num_state]();
 	parameters       = new double  [num_param];
 	param_loc        = new locint  [num_param];
 	xss_xss_yss_yss  = new double  [2*num_variable];
