@@ -8,6 +8,7 @@
 
 #include "tensor.hpp"
 
+/*
 class Perturbation {
 
     // Only called from public "Solve" method
@@ -26,27 +27,12 @@ public:
     Tensor gx, hx, gxx, hxx, gss, hss;
 
     // Solve the model
-    void Solve(void);
-
-    
+    void Solve(void);    
 };
+*/
 
-
-
-
-
-
-
-
-
-
-class Perturbation {
-public:
-    int num_state;
-    int num_control;
-
-    
-};
+#include "perturbation.hpp"
+#include "perturbation.cpp"
 
 int main(int argc, char **argv) {
 
@@ -301,7 +287,15 @@ int main(int argc, char **argv) {
     solve_gx_hx(gx, hx, tensor, num_control, num_state);
   
     //printf("gx: (lt, ct) (measurement)\n");
-    //Tensor({ny,nx},gx).print();
+    Tensor gx_T({ny,nx},gx);
+    Tensor hx_T({nx,nx},hx);
+
+    printf("gx: (lt, ct) (measurement)\n");
+    gx_T.print(); 
+
+    printf("hx: (lt, ct) (measurement)\n");
+    hx_T.print(); 
+
     //printf("\n");
   
     //printf("hx: (kt, zt) (transition)\n");
@@ -312,9 +306,18 @@ int main(int argc, char **argv) {
      * SOLVE GXX, HXX, GSS, HSS.
      **************************************************************************/
 
-    //Tensor gxx_T({ny,nx,1,nx});
-    //Tensor hxx_T({nx,nx,1,nx});
-    //solve_gxx_hxx(gxx_T, hxx_T, tensor, num_control, num_state, gx_T, hx_T);
+    Tensor gxx_T({ny,nx,1,nx});
+    Tensor hxx_T({nx,nx,1,nx});
+    solve_gxx_hxx(gxx_T, hxx_T, tensor, num_control, num_state, gx_T, hx_T);
+
+    printf("gxx: (lt, ct) (measurement)\n");
+    gxx_T.print(); 
+
+    printf("hxx: (lt, ct) (measurement)\n");
+    hxx_T.print(); 
+
+
+
     //printf("gxx: (lt, ct) (measurement)\n");
     //gxx_T.print();
     //printf("\n");
@@ -322,9 +325,9 @@ int main(int argc, char **argv) {
     //hxx_T.print();
     //printf("\n");
     
-    double gxx[ny*nx*nx];
-    double hxx[ny*nx*nx];
-    solve_gxx_hxx(gxx, hxx, tensor, num_control, num_state, gx, hx);
+    //double gxx[ny*nx*nx];
+    //double hxx[ny*nx*nx];
+    //solve_gxx_hxx(gxx, hxx, tensor, num_control, num_state, gx, hx);
 
     //printf("gxx: (lt, ct) (measurement)\n");
     //Tensor({ny,nx,1,nx},gxx).print();
@@ -338,16 +341,29 @@ int main(int argc, char **argv) {
 
     
     int num_shock = 1;
-    double eta[] = {0,1};
-    double *gss = new double [ny]();
-    double *hss = new double [nx]();
-    solve_gss_hss(gss, hss, tensor, num_control, num_state, num_shock, gx, gxx, eta);
+    //double eta[] = {0,1};
+    //double *gss = new double [ny]();
+    //double *hss = new double [nx]();
+
+    int neps = 1;
+    
+    Tensor gss_T({ny,1,1,1});
+    Tensor hss_T({ny,1,1,1});
+    Tensor eta_T({nx,neps});
+    eta_T.X[0] = 0;
+    eta_T.X[1] = 1;
+
+    solve_gss_hss(gss_T, hss_T, tensor, num_control, num_state, num_shock,
+		  gx_T, gxx_T, eta_T);
     
     printf("gss: (lt, ct) (measurement)\n");
-    Tensor({ny,1},gss).print(); 
+    gss_T.print(); 
 
-    printf("hss: (kt, zt) (transition)\n");
-    Tensor({nx,1},hss).print(); 
+    printf("hss: (lt, ct) (measurement)\n");
+    hss_T.print(); 
+
+    //printf("hss: (kt, zt) (transition)\n");
+    //Tensor({nx,1},hss).print(); 
     
   
     

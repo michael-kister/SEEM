@@ -176,19 +176,16 @@ void solve_gxx_hxx
     // now assign results
     gxx_T = Tensor({nx,1,nx,ny},&BA_T.X[0]);
     gxx_T ^= {3,0,1,2};
-    gxx_T.print();
+    //gxx_T.print();
 
     hxx_T = Tensor({nx,1,nx,nx},&BA_T.X[ny*nx*nx]);
     hxx_T ^= {3,0,1,2};
-    hxx_T.print();
+    //hxx_T.print();
 }
-
-
-
 
 void solve_gss_hss
 (Tensor& gss_T, Tensor& hss_T, double*** tensor, int num_control, int num_state, int neps,
- const Tensor& gx_T, const Tensor& gxx_T, const Tensor& eta)
+ const Tensor& gx_T, const Tensor& gxx_T, const Tensor& eta_T)
 {
     int nx = num_state;
     int ny = num_control;
@@ -202,8 +199,8 @@ void solve_gss_hss
 	    F_T += df_T * v1_T;
 	};
     Tensor F_T({nx+ny,1});
-    int n = nx+ny;
-    int widths[] = {nx,ny};
+    //int n = nx+ny;
+    //int widths[] = {nx,ny};
     
     //=====================================
     int widths0[] = {1,nx,nx,ny,ny};
@@ -239,12 +236,12 @@ void solve_gss_hss
 
     AB_T |= F_T;
 
-    Tensor gss_T = Tensor({1,1,1,ny},&AB_T.X[0]);
+    gss_T = Tensor({1,1,1,ny},&AB_T.X[0]);
     gss_T ^= {3,0,1,2};
-    gss_T.print();
+    //gss_T.print();
     
-    Tensor hss_T = Tensor({1,1,1,nx},&AB_T.X[ny*1*1]);
+    hss_T = Tensor({1,1,1,nx},&AB_T.X[ny*1*1]);
     hss_T ^= {3,0,1,2};
-    hss_T.print();
+    //hss_T.print();
 }
 

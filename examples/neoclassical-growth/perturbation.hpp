@@ -10,6 +10,6 @@ void solve_gxx_hxx
 
 void solve_gss_hss
 (Tensor& gss_T, Tensor& hss_T, double*** tensor, int num_control, int num_state, int neps,
- const Tensor& gx_T, const Tensor& gxx_T, const Tensor& eta);
+ const Tensor& gx_T, const Tensor& gxx_T, const Tensor& eta_T);
 
 #endif
